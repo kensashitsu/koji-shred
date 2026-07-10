@@ -45,7 +45,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v110｜v109ベース】でんぷんを化学模式図に刷新：六角格子→アミロペクチン（枝分かれ重合体）を種から成長生成。節数は固定GLUCOSE_N=150（タイム公平）、枝ぶり・うねりは毎ゲーム自動ランダム。削りは現行pickCut（近い順）を許容</span>
+    <span class="hint">【v111｜v110ベース】模式図フィールドを縦の帯いっぱいに：真円キャップを撤廃し縦長楕円（最大1.6:1）で生成＝上下の余白も使用。結合長Lは節数150でその楕円を埋める密度に算出</span>
   </header>
   <div class="foot">
     <span>酵素 <span class="life" id="life"></span></span>
@@ -149,8 +149,10 @@
   let latticeD=0;
   function spawnField(){   // ★デンプンの化学模式図（アミロペクチン＝幹α1-4＋枝α1-6の樹状重合体）を種から成長。節数は固定GLUCOSE_Nで、枝ぶり・うねりだけ毎回ランダム＝毎ゲーム違う分子だが削る量は一定
     starch=[]; bonds=[]; let id=0;
-    const rx=fieldRx(), ry=fieldRy(), N=GLUCOSE_N;
-    const L=fieldRx()*0.12; latticeD=L;                            // 結合長（グルコース節の間隔）
+    const rx=fieldRx();
+    const ry=Math.min((H-FIELD_T-FIELD_B)/2 - 16, rx*1.6);        // ★縦の帯を使う（真円キャップを撤廃）＝上下エリアも生成に使う。細長すぎ防止に1.6:1で上限
+    const N=GLUCOSE_N;
+    const L=Math.sqrt(Math.PI*rx*ry/(N*2.0)); latticeD=L;         // 結合長：節数Nでこの縦長楕円を程よく埋める間隔（密度感K=2.0＝サンプルと同等）＝縦にも広がる
     const s=L*0.42;                                                // 節(六角)の半径＝結合長より小さく＝隙間に結合線が見える模式図
     const minD2=(L*0.82)*(L*0.82);
     const inside=(x,y)=> (x*x)/(rx*rx)+(y*y)/(ry*ry) <= 1;         // 楕円フィールドの内側だけに置く
@@ -158,7 +160,7 @@
     const add=(x,y)=>{ starch.push({id, ox:x, oy:y, s, depth:0.9+Math.random()*0.1, ph:Math.random()*6.28,
       face:(Math.random()*3|0), tone:(Math.random()+Math.random()-1), lum:(Math.random()+Math.random()-1)}); return id++; };
     const curl=0.30+Math.random()*0.55, branchP=0.05+Math.random()*0.15;   // ★毎回ランダム：うねり・枝分かれ確率
-    const sx=(Math.random()-0.5)*rx*0.3, sy=(Math.random()-0.5)*ry*0.3, a0=Math.random()*6.28;
+    const sx=(Math.random()-0.5)*rx*0.2, sy=(Math.random()-0.5)*ry*0.2, a0=Math.random()*6.28;
     const seed=add(sx,sy);
     const tips=[ {x:sx,y:sy,prev:seed,dir:a0,depth:0}, {x:sx,y:sy,prev:seed,dir:a0+Math.PI,depth:0} ];   // 幹は両方向へ
     let guard=0; const GMAX=N*140;
