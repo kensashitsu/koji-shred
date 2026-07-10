@@ -1,0 +1,5 @@
+# 公開はゲーム本体(index.html)のみ。開発メモ・過去バージョン・比較ページ等はローカルに残す
+*
+!index.html
+!.gitignore
+!README.md

@@ -1,0 +1,747 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>ズタッ！ — 余熱の滑りで適温に着地、デンプンを切る</title>
+<style>
+  :root{ --bg:#211A12; --card:#2A2118; --ink:#F3EADB; --ink2:#B7A88C; --accent:#E0B24A; --green:#7FBE5A; --red:#E4553A; }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0; background:radial-gradient(120% 90% at 50% 0%, #2C2318, #1A140D 80%); color:var(--ink);
+    font-family:'Hiragino Kaku Gothic ProN','Yu Gothic','Segoe UI','Meiryo',sans-serif; -webkit-tap-highlight-color:transparent;
+    user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; overscroll-behavior:none; overflow:hidden; touch-action:manipulation}
+  .wrap{max-width:560px; margin:0 auto; height:100%; height:100dvh; display:flex; flex-direction:column; padding:14px;
+    padding-top:max(14px,env(safe-area-inset-top)); padding-bottom:max(14px,env(safe-area-inset-bottom)); gap:10px}
+  header{display:flex; align-items:baseline; gap:10px}
+  header h1{margin:0; font-size:19px; font-weight:800; letter-spacing:.02em}
+  header .hint{color:var(--ink2); font-size:12px; margin-left:auto}
+  .stage{flex:1; position:relative; border-radius:20px; overflow:hidden; background:linear-gradient(180deg,#2A2118,#221A11);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.05), 0 12px 30px rgba(0,0,0,.4); cursor:pointer;
+    touch-action:none; -webkit-user-select:none; min-height:0}
+  canvas{display:block; width:100%; height:100%; touch-action:none}
+  .sugars{display:flex; gap:5px}
+  .sugar-chip{flex:1; min-width:0; display:flex; align-items:center; gap:5px; background:var(--card); border-radius:10px; padding:6px 7px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.05); transition:transform .14s cubic-bezier(.2,1.7,.4,1); transform-origin:center}
+  .sugar-chip .mol{display:flex; align-items:center; flex:none}
+  .sugar-chip .mol .pt{width:7px; height:7px; border-radius:50%; box-shadow:0 0 5px currentColor}
+  .sugar-chip .mol .lnk{width:3px; height:2px; background:rgba(255,255,255,.4)}
+  .sugar-chip .nm{font-size:10.5px; color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .sugar-chip .ct{margin-left:auto; font-weight:800; font-size:14px; color:var(--ink); font-variant-numeric:tabular-nums}
+  .life{display:inline-flex; gap:5px; vertical-align:middle}
+  .enz{width:16px; height:16px; border-radius:50% 50% 50% 50%/60% 60% 42% 42%;
+    background:radial-gradient(circle at 34% 30%, #C4EDA8, #6FBE4A); box-shadow:0 0 6px rgba(127,190,90,.6);
+    transition:transform .2s, opacity .25s, background .25s, box-shadow .25s}
+  .enz.dead{background:#4a4a44; box-shadow:none; opacity:.35; transform:scale(.8) rotate(12deg)}
+  .foot{display:flex; align-items:center; gap:12px; color:var(--ink2); font-size:12px}
+  .foot .big{font-size:15px; color:var(--ink); font-weight:800; display:inline-block; transform-origin:center bottom; transition:transform .13s cubic-bezier(.2,1.7,.4,1), color .13s}
+  .foot .sp{margin-left:auto}
+  .overlay{position:absolute; inset:0; display:grid; place-items:center; background:rgba(20,14,8,.72); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); z-index:5; text-align:center; padding:24px; overflow:auto}
+  .overlay[hidden]{display:none}
+  .overlay h2{margin:0 0 8px; font-size:24px}
+  .overlay p{color:var(--ink2); line-height:1.7; font-size:14px; margin:6px 0 0}
+  .overlay b{color:var(--accent)}
+  .btn{margin-top:18px; border:none; cursor:pointer; font-family:inherit; font-weight:800; font-size:17px; color:#241a08;
+    background:var(--accent); padding:14px 32px; border-radius:12px; box-shadow:0 5px 0 #9c7a1e; transition:transform .07s}
+  .btn:active{transform:translateY(3px); box-shadow:0 2px 0 #9c7a1e}
+  @media (max-width:560px){ header .hint{display:none} header h1{font-size:22px} .overlay h2{font-size:22px} .overlay p{font-size:13.5px} }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>ズタッ！</h1>
+    <span class="hint">【v107｜v106ベース】タッチ加熱の底上げ：入力がタッチの時だけ加熱倍率TOUCH_HEAT_MUL=1.9（マウスは1.0＝据置）。小画面で擦り距離を稼げない問題を解消。同一運動で温度上昇が実測1.7倍
+  </header>
+  <div class="stage" id="stage">
+    <canvas id="cv"></canvas>
+    <div id="dbg" style="position:absolute;top:8px;left:10px;z-index:6;pointer-events:none;font:700 12px ui-monospace,Menlo,Consolas,monospace;color:#8fe3c8;text-shadow:0 1px 2px rgba(0,0,0,.6)"></div>
+    <div class="overlay" id="ov">
+      <div>
+        <h2>ズタッ！</h2>
+        <p><b>①</b> 画面を<b>ゆびでゴシゴシ</b>こする＝温まる（<b>速く往復</b>するほど熱い）<br>
+        <b>②</b> 右の温度計が<b>適温の帯</b>で擦ると<b>でんぷんが糖に</b>。<b>全部こわせばクリア！</b><br>
+        <b>③</b> 熱くしすぎると<b>酵素が失活</b>（3つで終了）。<b>アツくなったら手を止めて冷ませ。</b><br>
+        <b>④</b> でも<b>冷やしすぎもNG</b>。<b>54℃を下回ると酸敗ゲージ</b>（左）がジワジワ上昇＝<b>戻らない</b>。<b>満タンでゲームオーバー</b>。</p>
+        <p style="font-size:12px">※片道スワイプでは温まらない／適温はゆらゆら動くので追いかけて</p>
+        <button class="btn" id="start">はじめる</button>
+      </div>
+    </div>
+  </div>
+  <div class="sugars" id="sugars"></div>
+  <div class="foot">
+    <span>酵素 <span class="life" id="life"></span></span>
+    <span>連続 <span class="big" id="combo">0</span></span>
+    <span>ベスト <span class="big" id="best">0</span></span>
+    <span class="sp" id="mute">🔊</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+  const stage=document.getElementById("stage");
+  const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+  let W=0,H=0,DPR=Math.min(2,window.devicePixelRatio||1);
+  function resize(){ const r=stage.getBoundingClientRect(); W=r.width; H=r.height;
+    cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  new ResizeObserver(resize).observe(stage); resize();
+
+  // ---- チューニング（触って調整する所）----
+  const START_T=20, MOVE_CAP=90, STROKE_CAP=90;   // 開始温度 / 1F擦り上限 / 1ストローク距離上限
+  const GREEN=[57,64], DENATURE=73;               // 64〜=危険域 / 崖73℃。β失活70℃はデキストリン帯、糖化系崩壊/焦げの“崖”はより高温という整合
+  // 温度で出来る糖が変わる（酵素の使い分け）：低温=グルコアミラーゼ→グルコース、中温=β-アミラーゼ→マルトース、高温=α優勢→デキストリン(甘いが崖寸前)
+  const SUGARS=[  // dp=分子中のグルコース数＝発火で一度にちぎれる塊のサイズ（大きい糖ほど沢山ちぎれて速いが高温＝崖リスク）
+    {key:"glu", name:"グルコース",      lo:57,   hi:61,   col:"#6FD8C6", dp:1},
+    {key:"mal", name:"マルトース",      lo:61,   hi:64,   col:"#9BD26F", dp:2},
+    {key:"mt3", name:"マルトトリオース", lo:64,   hi:66.5, col:"#EAD24E", dp:3},
+    {key:"dex", name:"デキストリン",     lo:66.5, hi:73,   col:"#E4883C", dp:5},
+  ];
+  const MOL_PER_FIRE=4;                           // 1発火で作る“分子の数”。ちぎれる玉数＝dp×これ（分子が大きいほど沢山ちぎれる）
+  const CIRC=['','①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
+  const MAX_LIFE=3;                               // 酵素ライフ。崖(失活)ごとに1つ失い、ゼロでゲームオーバー
+  function sugarAt(t){ for(const s of SUGARS) if(t>=s.lo && t<s.hi) return s; return SUGARS[t>=70?3:0]; }
+  function hexA(h,a){ const n=parseInt(h.slice(1),16); return "rgba("+(n>>16&255)+","+(n>>8&255)+","+(n&255)+","+a+")"; }
+  // 適温の“揺らぎ”：狭い適温バンド(中心zC・半幅ZW)がゆっくりランダムに漂う＝擦りの単純化を防ぐ。糖は狙わず、その時のzCの位置で結果的に決まる
+  // Z_BIAS へ引き戻すバネ(Z_PULL)で低分子帯に居座りがち＝高分子(デキストリン等)は“たまに揺らいだ時だけ”のボーナス→ゲームが早終わりしない
+  const ZW=2.8, Z_MIN=58, Z_MAX=69, Z_MID=63, Z_BIAS=63, Z_PULL=0.26, Z_NOISE=48, Z_MAXV=4.2, Z_DAMP=0.5;  // 配分≈glu35/mal28/mt3 17/dex20%（Z_MINを下げ低温側=グルコースを届きやすく。高分子ほど稀＝ご褒美）
+  const Z_MUL_LO=0.45, Z_MUL_HI=2.2, Z_SLO=60, Z_SHI=68;   // 速度可変：低温(glu)ほど遅く=捕まえやすい／高温(dex)ほど速く=逃げる・崖への緊張
+  const DASH_MIN=2.2, DASH_MAX=4.5, DASH_V=14;             // 突発ダッシュ：ときどき適温がいきなり別の帯（特に高分子側）へ素早く飛ぶ＝読み合い
+  const WALL0=48;                                 // 48℃〜適温直前が“重い壁”＝上がるほど重い山場
+  const TLO=20, THI=75;                           // 温度計の表示レンジ（崖の少し上まで）
+  // 擦り→発熱の効き（温度帯で変化）：序盤ふつう→壁は上ほど重い→適温はホバー可→はみ出し帯は放置で崖へ
+  const HEAT_BASE=0.03, WALL_HI=0.6, WALL_LO=0.14, OVER_EFF=1.0;
+  const TOUCH_HEAT_MUL=1.9;   // スマホ(タッチ)は画面が小さく1往復で稼げる擦り距離がPCマウスより少ない＋速い往復で1F上限に当たり切り捨てられがち→タッチ時だけ加熱の効きをこの倍率で底上げ（マウスは1.0＝“丁度よかった”手触りを維持）
+  // 適温帯：擦り加熱（上限GCAP＝雑に強く擦ると一気に崖へ）＋ 発火ごとに発熱FIRE_HEAT（連発するほど崖に近づく）
+  const GREEN_EFF=0.6, GCAP=40, FIRE_HEAT=2.5;
+  // 冷却（放物運動イメージ）：離した直後はGCOOL＋時間×COOL_ACCELのゆるい下降、DROP_DELAY秒を過ぎると重力項(二次)でどんどん加速して20℃の床へ落下
+  const GCOOL=6, COOL_ACCEL=34, DROP_DELAY=0.75, COOL_GRAV=55, COOL_MAX=150;  // 離した時の落下を速めて下降ダッシュに追いつけるように（ホバー中はidleT=0でGCOOLのまま＝手触り不変）
+  // 酸敗リスク（低温側の罰＝両側リスク化）：★アナログなゲージ制。54℃未満で酸度が上がる（不可逆＝戻らない）、満タンでゲームオーバー
+  const SOUR_T=54, SOUR_RATE=0.23, SOUR_COLD=2.1;   // ほんの少し厳しめに（0.20→0.23）。「4回前後のミスで満タン」くらい。低温ほど速く(最大2.1倍)＝深く落とすほど一気に酸度上昇。作動猶予：一度57℃到達してから（スタートの登坂は腐らない）。DENATURE_KNOCK=55>閾値54で失活が酸敗を誘発しない
+  const DENATURE_KNOCK=55;                         // 失活したら温度をここまで押し戻す（発火ゾーン57の少し下＝登り直し＋酸敗閾値50より上＝二重罰回避）
+  const MOM=3.2;                                   // 余熱の粘り（小さいほど長く滑る）
+  const WINDUP=0.14;                              // 発火の寸止め
+  const SHRED_WORK=110;                           // 1回ちぎる(発火)のに要る“擦り仕事量”＝ほぼ1ストローク。擦った分だけ発火＝自分でコンボを刻む手応え
+  const STARCH_N=16;
+  function heatEff(t){                            // 適温“外”の擦りの効き（適温帯はbasinで別処理）
+    if(t>GREEN[1]) return OVER_EFF;               // はみ出し帯(64〜70)＝擦れば崖へ／緩めれば冷えて戻る
+    if(t>=WALL0){ const k=(t-WALL0)/(GREEN[0]-WALL0);  // 壁：上がるほど重い
+      return WALL_HI+(WALL_LO-WALL_HI)*k; }
+    return 0.5 + (t-START_T)/(WALL0-START_T)*0.5; // 序盤：0.5→1.0へ加速（登れる）
+  }
+
+  // ---- 状態 ----
+  let running=false, temp=START_T, heatE=0, aimT=START_T, charge=0, idleT=0, hitstop=0, denLock=0, moveStarted=false;
+  let combo=0, best=0, respawn=0, totalStarch=0, fireX=0, fireY=0, sugarStock={}, zC=Z_MID, zVel=0, pendingSugar=null, enzymeLife=MAX_LIFE;
+  let runStart=0, elapsed=0, bestTime=null, winIsBest=false, dashT=3, dashHold=0, dashDir=0;
+  let sour=0, sourArmed=false, overReason="enzyme";               // 酸敗ゲージ(0..1・不可逆)／作動フラグ(57℃到達で真)／敗因
+  try{ const b=localStorage.getItem('kojiShredBest'); if(b) bestTime=parseFloat(b); }catch(e){}
+  (function(){ const d=document.getElementById("dbg"); if(d) d.style.display="none"; })();   // デバッグ表示は隠す（スコアHUDを出すため）
+  function fmtTime(s){ s=Math.max(0,s); const m=Math.floor(s/60), sec=s-m*60; return m+":"+(sec<10?"0":"")+sec.toFixed(1); }
+  let firing=false, fireT=0, curN=STARCH_N;
+  let shakeX=0,shakeY=0,shakeMag=0, flash=0, bloom=0;
+  let starch=[], parts=[], pops=[], rings=[], bonds=[], snaps=[];
+  let prevTemp=START_T, whooshed=false, dangerBeatT=0, pendingCut={};
+  // でんぷんの塊は「左＝酸敗ゲージ／右＝温度計／上＝タイマー／下＝進捗バー」に挟まれた帯の“中央”に置く（重なり＆片寄り防止）
+  const FIELD_L=42, FIELD_R=74, FIELD_T=50, FIELD_B=40;           // 各UIを避けるための内側マージン（右は糖名を背景チップ化して詰めた）
+  const fieldRx=()=>Math.min(W*0.46, (W-FIELD_L-FIELD_R)/2 - 6);
+  const fieldRy=()=>Math.min(fieldRx()*1.02, (H-FIELD_T-FIELD_B)/2 - 6);  // ほぼ真円（縦長エッグは不評＝丸をキープ。上下余白は全高レールが枠として受ける）
+  const cx=()=>(FIELD_L + (W-FIELD_R))/2;                          // 帯の水平中央（酸敗ゲージと温度計の内側の中点）
+  const cy=()=>(FIELD_T + (H-FIELD_B))/2;                          // 帯の垂直中央
+
+  let latticeD=0;
+  function spawnField(){                                          // 六角格子（結晶パック）。放射状ライティングでドーム状の陰影＝平坦さ解消。冷たいうちは線が隠れた結晶の塊
+    starch=[]; let id=0;
+    const rx=fieldRx(), ry=fieldRy(), N=210;                       // 帯の中央に収まる丸い結晶チップ（両ゲージに重ならない）
+    const d=Math.sqrt(Math.PI*rx*ry/(0.866*N)); latticeD=d;        // 格子間隔（目標数Nから算出）
+    const s60=Math.sqrt(3)/2, base=d*0.58;                         // 密着する六角サイズ（ぴっちり）
+    let row=0;
+    for(let y=-ry; y<=ry+1e-6; y+=d*s60){ const xoff=(row&1)*d/2;  // 六角配列（奇数行を半ピッチずらす）
+      for(let x=-rx+xoff; x<=rx+1e-6; x+=d){
+        const rn=Math.sqrt((x*x)/(rx*rx)+(y*y)/(ry*ry)); if(rn>1) continue;   // 楕円の内側だけ＝きれいな輪郭
+        const depth=Math.max(0,Math.min(1, 1 - 0.5*rn + (Math.random()-0.5)*0.08));   // 中心=明るく手前／縁=暗く奥＝ドーム状の陰影＆重なりで立体に
+        starch.push({id:id++, ox:x, oy:y, s:base*(0.9+Math.random()*0.2), depth, ph:Math.random()*6.28, face:(Math.random()*3|0),
+          tone:(Math.random()+Math.random()-1), lum:(Math.random()+Math.random()-1)});   // 玉ごとの微小な色個体差（暖⇄寒・明⇄暗）＝均一ピンクを有機的な斑に。三角分布で中央寄り
+
+      } row++; }
+    totalStarch=starch.length; for(const u of starch) bakeBody(u);   // 本体スプライトを各玉ぶん一度だけ焼く（以降はdrawImageで貼るだけ）
+    buildBonds(); }
+  function buildBonds(){                                          // 密：格子の近傍を全部つなぐ＝三角/ハニカムの結晶格子（構造図らしさ）
+    bonds=[]; const th2=(latticeD*1.18)*(latticeD*1.18);
+    for(let i=0;i<starch.length;i++){ const u=starch[i];
+      for(let j=i+1;j<starch.length;j++){ const v=starch[j]; const dx=u.ox-v.ox, dy=u.oy-v.oy;
+        if(dx*dx+dy*dy<th2) bonds.push({a:u.id, b:v.id}); } } }
+
+  // ---- 音 ----
+  let AC=null,muted=false;
+  function ac(){ if(!AC){try{AC=new(window.AudioContext||webkitAudioContext)()}catch(e){}} return AC; }
+  function beep(f,d,t,v){ if(muted)return; const a=ac(); if(!a)return; const o=a.createOscillator(),g=a.createGain();
+    o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||.05; o.connect(g); g.connect(a.destination);
+    const n=a.currentTime; g.gain.exponentialRampToValueAtTime(.0001,n+(d||.1)); o.start(n); o.stop(n+(d||.1)); }
+  function crunch(pow){ if(muted)return; const a=ac(); if(!a)return; pow=pow||1; // ザシャッ：ノイズ＋低い衝撃
+    const b=a.createBuffer(1,a.sampleRate*0.3,a.sampleRate), ch=b.getChannelData(0);
+    for(let i=0;i<ch.length;i++){ ch[i]=(Math.random()*2-1)*Math.pow(1-i/ch.length,1.7); }
+    const s=a.createBufferSource(); s.buffer=b; const g=a.createGain(); g.gain.value=.55;
+    const lp=a.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=2000+pow*1200;
+    s.connect(lp); lp.connect(g); g.connect(a.destination); s.start();
+    beep(110,0.2,"sine",.16); setTimeout(()=>beep(70,0.18,"triangle",.12),18); }
+  function windupSound(){ if(muted)return; const a=ac(); if(!a)return; // 頂点へ張り詰める上昇音
+    const o=a.createOscillator(),g=a.createGain(); o.type="sawtooth"; const n=a.currentTime;
+    o.frequency.setValueAtTime(320,n); o.frequency.exponentialRampToValueAtTime(1250,n+WINDUP);
+    g.gain.setValueAtTime(.05,n); g.gain.exponentialRampToValueAtTime(.0001,n+WINDUP+0.04);
+    o.connect(g); g.connect(a.destination); o.start(n); o.stop(n+WINDUP+0.05); }
+  function whooshSound(){ if(muted)return; const a=ac(); if(!a)return; // 落下のヒュン：下降する笛＋空気ノイズ
+    const n=a.currentTime;
+    const o=a.createOscillator(),g=a.createGain(); o.type="sine";
+    o.frequency.setValueAtTime(760,n); o.frequency.exponentialRampToValueAtTime(95,n+0.5);
+    g.gain.setValueAtTime(.0001,n); g.gain.linearRampToValueAtTime(.09,n+0.06); g.gain.exponentialRampToValueAtTime(.0001,n+0.55);
+    o.connect(g); g.connect(a.destination); o.start(n); o.stop(n+0.6);
+    const b=a.createBuffer(1,(a.sampleRate*0.5)|0,a.sampleRate), ch=b.getChannelData(0);
+    for(let i=0;i<ch.length;i++) ch[i]=(Math.random()*2-1)*(1-i/ch.length);
+    const s=a.createBufferSource(); s.buffer=b; const bp=a.createBiquadFilter(); bp.type="bandpass"; bp.Q.value=1.1;
+    bp.frequency.setValueAtTime(1300,n); bp.frequency.exponentialRampToValueAtTime(220,n+0.5);
+    const g2=a.createGain(); g2.gain.setValueAtTime(.07,n); g2.gain.exponentialRampToValueAtTime(.0001,n+0.5);
+    s.connect(bp); bp.connect(g2); g2.connect(a.destination); s.start(n); }
+  function dangerBeat(prox){ if(muted)return; const a=ac(); if(!a)return; // 崖が近いほど強く速い鼓動
+    const n=a.currentTime; const o=a.createOscillator(),g=a.createGain(); o.type="sine";
+    o.frequency.setValueAtTime(62,n); o.frequency.exponentialRampToValueAtTime(36,n+0.14);
+    g.gain.setValueAtTime(.0001,n); g.gain.linearRampToValueAtTime(.05+prox*.09,n+0.02); g.gain.exponentialRampToValueAtTime(.0001,n+0.16);
+    o.connect(g); g.connect(a.destination); o.start(n); o.stop(n+0.18); }
+  let lastSnd=0;
+  function scrubSound(){ const t=performance.now(); if(t-lastSnd<50)return; lastSnd=t;
+    beep(150+temp*8,.05,"square",.03); }  // 温度が上がるほど高い＝助走の手応え
+
+  // ---- 入力：擦る＝往復。折り返した時だけ発熱（＝一方向スワイプは発熱ゼロ）----
+  let px=0,py=0,hasP=false, moved=0, rawMove=0, strokeDir=null, strokeLen=0, revCount=0, dbgSpd=0;
+  let activeTouch = matchMedia("(pointer:coarse)").matches;   // 現在の入力がタッチか（初期値=粗いポインタ端末。pointerdownで都度確定）
+  function scrub(dx,dy,x,y){ if(!running||denLock>0) return; const d=Math.hypot(dx,dy); if(d<2) return;
+    const nx=dx/d, ny=dy/d;
+    if(!strokeDir){ strokeDir=[nx,ny]; strokeLen=d; }
+    else if(nx*strokeDir[0]+ny*strokeDir[1] < -0.3){   // 進行方向が反転＝1ストローク完成
+      moved += Math.min(strokeLen, STROKE_CAP); revCount++;  // その一擦りで進んだ距離ぶん発熱
+      strokeDir=[nx,ny]; strokeLen=d;
+    } else { strokeLen += d; }
+    const rev = moved>0;                                 // 反転直後だけ強めの火花
+    for(let i=0;i<(rev?4:1);i++) parts.push({x:x+(Math.random()*10-5),y:y+(Math.random()*10-5),vx:(Math.random()*2-1),vy:-1-Math.random()*2,
+      life:.5, sz:2+Math.random()*2, col:"#F2A03C", spark:true}); scrubSound(); }
+  function pos(e){ const r=stage.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
+  function resetStroke(){ strokeDir=null; strokeLen=0; }
+  stage.addEventListener("pointerdown", e=>{ if(!running)return; e.preventDefault();
+    activeTouch = (e.pointerType==="touch");                  // この操作がタッチかマウスかを確定（加熱倍率の切替に使う）
+    try{ stage.setPointerCapture(e.pointerId); }catch(_){}    // 指が枠外に出ても擦り追従を保つ（capture）
+    [px,py]=pos(e); hasP=true; resetStroke(); });
+  stage.addEventListener("pointermove", e=>{ if(!running)return; e.preventDefault(); const [x,y]=pos(e);
+    if(hasP){ let dx=x-px, dy=y-py; const d=Math.hypot(dx,dy);
+      if(d>0.4){ rawMove+=d; if(d>60){ dx*=60/d; dy*=60/d; } scrub(dx,dy,x,y); } }  // rawMove=実際に指が動いた量（リリース判定用）
+    px=x; py=y; hasP=true; }, {passive:false});
+  function endPointer(){ hasP=false; resetStroke(); }
+  stage.addEventListener("pointerup", endPointer);
+  stage.addEventListener("pointercancel", endPointer);      // iOS：システムにジェスチャを奪われた時
+  stage.addEventListener("pointerleave", endPointer);
+  stage.addEventListener("touchmove", e=>{ if(running) e.preventDefault(); }, {passive:false});  // ゴシゴシ中のスクロール/ラバーバンドを抑止
+  document.getElementById("start").addEventListener("click", ()=>{ const a=ac(); if(a&&a.state==="suspended"){ try{ a.resume(); }catch(_){} } start(); });
+  document.getElementById("mute").addEventListener("click", e=>{ muted=!muted; e.currentTarget.textContent=muted?"🔇":"🔊"; });
+
+  (function buildChips(){ const el=document.getElementById("sugars"); if(!el) return;
+    SUGARS.forEach(s=>{ const c=document.createElement("div"); c.className="sugar-chip"; c.id="chip-"+s.key; c.style.color=s.col;
+      let mol='<span class="mol">'; for(let i=0;i<s.dp;i++){ if(i) mol+='<span class="lnk"></span>'; mol+='<span class="pt" style="background:'+s.col+'"></span>'; } mol+='</span>';
+      c.innerHTML=mol+'<span class="nm">'+s.name+'</span><span class="ct" id="ct-'+s.key+'">0</span>';   // 連結の数＝分子サイズ（テキストなしで分かる）
+      el.appendChild(c); }); })();
+  function resetSugar(){ sugarStock={}; SUGARS.forEach(s=>{ sugarStock[s.key]=0; const ct=document.getElementById("ct-"+s.key); if(ct) ct.textContent=0; }); }
+  (function buildLife(){ const el=document.getElementById("life"); if(!el) return;
+    for(let i=0;i<MAX_LIFE;i++){ const e=document.createElement("span"); e.className="enz"; e.id="enz-"+i; el.appendChild(e); } })();
+  function refreshLife(){ for(let i=0;i<MAX_LIFE;i++){ const e=document.getElementById("enz-"+i); if(e) e.classList.toggle("dead", i>=enzymeLife); } }
+
+  function start(){ running=true; temp=START_T; heatE=0; charge=0; idleT=0; combo=0; denLock=0; respawn=0;
+    parts=[]; pops=[]; rings=[]; snaps=[]; pendingCut={}; pendingSugar=null; resetSugar(); zC=Z_MID; zVel=0;
+    enzymeLife=MAX_LIFE; refreshLife(); runStart=performance.now(); elapsed=0; winIsBest=false;
+    dashT=DASH_MIN+Math.random()*(DASH_MAX-DASH_MIN); dashHold=0; dashDir=0; sour=0; sourArmed=false; overReason="enzyme"; moveStarted=false;
+    document.getElementById("combo").textContent=0; document.getElementById("ov").hidden=true; spawnField(); }
+
+  function startFiring(){ firing=true; fireT=WINDUP; windupSound();
+    pendingSugar=sugarAt(zC);                                        // 今の適温の位置で出来る糖を確定（発熱前）→ dp で壊す量が決まる
+    pendingCut=pickCut(pendingSugar.dp);                             // このちぎりで壊す玉を予約→発火中に赤バツで予告
+    let sx=0,sy=0,n=0; for(const id in pendingCut){ const u=starch.find(v=>v.id==id); if(u){sx+=cx()+u.ox; sy+=cy()+u.oy; n++;} }
+    fireX = n?sx/n:(px||cx()); fireY = n?sy/n:(py||cy()); }              // 破壊点＝壊す玉の中心（発火中の閃光もここ）
+  function pickCut(dp){ const o={}; if(!starch.length) return o;      // 指の下から、糖の分子サイズ×分子数ぶんの玉をまとめて壊す
+    const want=Math.min(starch.length, (dp||1)*MOL_PER_FIRE);
+    const tx=px-cx(), ty=py-cy();
+    const order=starch.map(u=>[ (u.ox-tx)*(u.ox-tx)+(u.oy-ty)*(u.oy-ty), u.id ]).sort((a,b)=>a[0]-b[0]);
+    for(let i=0;i<want;i++) o[order[i][1]]=1;
+    return o; }
+  function shred(){
+    combo++; best=Math.max(best,combo);
+    const cE=document.getElementById("combo"); cE.textContent=combo; document.getElementById("best").textContent=best;
+    cE.style.transform="scale(1.65)"; cE.style.color="#E0B24A";       // フッター数字がビクッと躍動
+    clearTimeout(cE._t); cE._t=setTimeout(()=>{cE.style.transform="scale(1)"; cE.style.color="";},130);
+    const e=Math.min(combo,10);
+    // === 破壊：指の下のでんぷんを、糖の分子サイズ(dp)ごとの塊で壊す。破壊の中心(fx,fy)に演出を集中 ===
+    const sug = pendingSugar || sugarAt(zC), dp = sug?sug.dp:1;       // 今の適温で出来る糖＝分子サイズdp
+    const byId={}; for(const u of starch) byId[u.id]=u;
+    const cut = Object.keys(pendingCut).length ? pendingCut : pickCut(dp);
+    let fx=0, fy=0, nc=0;
+    for(const id in cut){ const u=byId[id]; if(!u)continue; fx+=(u._x!=null?u._x:cx()+u.ox); fy+=(u._y!=null?u._y:cy()+u.oy); nc++; }
+    if(nc){ fx/=nc; fy/=nc; } else { fx=px||cx(); fy=py||cy(); }
+    fireX=fx; fireY=fy;
+    crunch(1.1+e*0.12+dp*0.13); shakeMag=20+e*1.8+dp*4.5+Math.min(nc,24)*0.5; flash=Math.min(.96,.72+dp*.05); bloom=1; hitstop=0.10+e*0.005+dp*0.008; // 爽快感全振り＋高分子ほど派手
+    beep(520+e*72,.13,"triangle",.05);                                // コンボで上がる明るいチャイム
+    rings.push({x:fx,y:fy,r:16,vr:520+e*44+dp*95+nc*6,w:9+dp*1.9,life:1});  // 主リング（高分子ほど大きく速く）
+    rings.push({x:fx,y:fy,r:8,vr:340+e*26+dp*60,w:5+dp*0.9,life:1});
+    if(dp>=3) rings.push({x:fx,y:fy,r:22,vr:720+dp*75,w:5,life:1});   // 高分子は追加の大リング
+    if(dp>=5) rings.push({x:fx,y:fy,r:34,vr:980,w:4,life:1});         // デキストリンはさらに特大の輪
+    // 切れる結合＝壊れる玉に触れているボンド → 線が“パンッ”と弾け戻る(snaps)＋切断点から赤破片
+    for(const bd of bonds){ if(!(cut[bd.a]||cut[bd.b])) continue; const a=byId[bd.a], b=byId[bd.b]; if(!a||!b) continue;
+      const ax=a._x!=null?a._x:cx()+a.ox, ay=a._y!=null?a._y:cy()+a.oy, bx=b._x!=null?b._x:cx()+b.ox, by=b._y!=null?b._y:cy()+b.oy;
+      snaps.push({ax,ay,bx,by,life:1});
+      const mx=(ax+bx)/2, my=(ay+by)/2, ang=Math.atan2(by-ay,bx-ax)+Math.PI/2;
+      for(let k=-1;k<=1;k+=2){ const sp=2.5+Math.random()*3.5;
+        parts.push({x:mx,y:my,vx:Math.cos(ang)*k*sp,vy:Math.sin(ang)*k*sp-1.4,life:.55,sz:2+Math.random()*2,col:"#E4553A",spark:true}); } }
+    // 壊れた玉を「dp個が連結した“分子”」として飛ばす＝連結の数で分子サイズが見て分かる（テキスト不要）
+    const cutU=starch.filter(u=>cut[u.id]);
+    cutU.sort((A,B)=> ((A._x-fx)*(A._x-fx)+(A._y-fy)*(A._y-fy)) - ((B._x-fx)*(B._x-fx)+(B._y-fy)*(B._y-fy)) );  // 近い順＝分子メンバーが空間的にまとまる
+    const mb=14;                                                 // 飛ぶ分子の玉サイズ（形は残すが認識性より勢い優先）
+    for(let g=0; g*dp<cutU.length; g++){
+      const mem=cutU.slice(g*dp, g*dp+dp); const nu=mem.length;
+      let mx=0,my=0; for(const u of mem){ mx+=u._x; my+=u._y; } mx/=nu; my/=nu;
+      const a=Math.atan2(my-fy,mx-fx)+(Math.random()*.7-.35), sp=(9+Math.random()*10)*(1+e*0.05+dp*0.05);  // 高分子ほど勢いよく遠くへ
+      let units;
+      if(nu>=3){ const R=mb*1.7/(2*Math.sin(Math.PI/nu));
+        units=mem.map((u,i)=>{ const ang=-Math.PI/2 + i*2*Math.PI/nu; return {dx:Math.cos(ang)*R, dy:Math.sin(ang)*R, face:u.face, s:mb}; }); }
+      else { const gap=mb*1.6; units=mem.map((u,i)=>({dx:(i-(nu-1)/2)*gap, dy:0, face:u.face, s:mb})); }
+      parts.push({x:mx, y:my, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-3, rot:Math.random()*6.28, vr:(Math.random()*2-1)*.5, life:1.0, mol:true, closed:nu>=3, col:sug?sug.col:"#9BD26F", units}); }
+    const sparkN=26+e*5+dp*9+Math.min(nc,24); for(let i=0;i<sparkN;i++){ const a=Math.random()*6.28, sp=5+Math.random()*(14+e+dp*3);
+      parts.push({x:fx,y:fy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:.9,sz:2+Math.random()*3.2,col:["#FFF0C0","#FFD9E8","#E0B24A","#7FBE5A"][i%4],spark:true}); }
+    const strN=6+dp*4+Math.round(e*0.7); for(let i=0;i<strN;i++){ const ang=Math.random()*6.28, sp=12+Math.random()*(11+dp*2.5);  // 放射状のバースト光条＝爆発感（高分子ほど多い）
+      parts.push({x:fx,y:fy,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:.48,sz:2.5,col:"#FFE9C0",streak:true}); }
+    const conN=dp*5; for(let i=0;i<conN;i++){ const ang=Math.random()*6.28, sp=4+Math.random()*11;  // 糖色コンフェッティ＝高分子ほど華やか
+      parts.push({x:fx,y:fy,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-2,life:1.1,sz:2+Math.random()*2.6,col:sug?sug.col:"#9BD26F",spark:true}); }
+    // 破壊後の残り
+    starch=starch.filter(u=>!cut[u.id]);
+    bonds=bonds.filter(bd=>!(cut[bd.a]||cut[bd.b]));
+    pendingCut={};
+    // 出来た糖の“分子の数”をストック（壊した玉数nc ÷ 分子サイズdp）→ 糖名ポップ＆チップ加算
+    if(sug){ const mol=Math.max(1,Math.round(nc/dp)); sugarStock[sug.key]=(sugarStock[sug.key]||0)+mol;
+      const ct=document.getElementById("ct-"+sug.key); if(ct) ct.textContent=sugarStock[sug.key];
+      const chip=document.getElementById("chip-"+sug.key); if(chip){ chip.style.transform="scale(1.14)"; clearTimeout(chip._t); chip._t=setTimeout(()=>chip.style.transform="scale(1)",150); }
+      pops.push({x:fx,y:fy-22,txt:sug.name,life:1.0,col:sug.col,age:0,sz:26+Math.min(combo,20)*0.7});
+      // 高分子ほど一度に沢山ちぎれる＝クリアが速い、を数字でも見せる（-N個。タイム短縮＝インセンティブ。競う数字ではない）
+      if(nc>=6) pops.push({x:fx,y:fy+16,txt:"−"+nc,life:.9,col:sug.col,age:0,sz:16+Math.min(nc,24)});
+    } else pops.push({x:fx,y:fy-22,txt:"ズタッ！",life:.9,col:"#fff",age:0,sz:32});
+    pendingSugar=null;
+    heatE=0; firing=false; temp+=FIRE_HEAT;               // 発火ごとに発熱＝連発するほど崖に近づく（駆け引き）。温度は維持＝居座り連鎖
+    if(starch.length===0) win();                          // 画面のでんぷんを全部壊した＝ゲームクリア
+  }
+  function win(){ running=false; firing=false; charge=0;
+    winIsBest = (bestTime==null || elapsed<bestTime);            // タイムアタック：新記録判定＆保存
+    if(winIsBest){ bestTime=elapsed; try{ localStorage.setItem('kojiShredBest', bestTime.toFixed(2)); }catch(e){} }
+    fireX=cx(); fireY=cy(); bloom=1; flash=.85; shakeMag=22;
+    for(let i=0;i<3;i++) rings.push({x:cx(),y:cy(),r:20,vr:460+i*140,w:11,life:1});
+    for(let i=0;i<90;i++){ const a=Math.random()*6.28, sp=3+Math.random()*11;
+      parts.push({x:cx(),y:cy(),vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,life:1.2,sz:2+Math.random()*3,col:["#FFD9E8","#E0B24A","#7FBE5A","#8fe3c8"][i%4],spark:true}); }
+    pops.push({x:cx(),y:cy()-10,txt:"ぜんぶ分解！",life:2.2,col:"#EAF6D8",age:0,sz:46});
+    winFanfare(); setTimeout(showWinOverlay, 950); }
+  function winFanfare(){ if(muted)return; [523,659,784,1047,1319].forEach((f,i)=> setTimeout(()=>beep(f,.28,"triangle",.07), i*120)); }
+  function showWinOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
+    ov.querySelector("h2").textContent="ゲームクリア！";
+    const tot=SUGARS.map(s=>s.name+' <b style="color:'+s.col+'">'+(sugarStock[s.key]||0)+'</b>').join('　');
+    const timeLine='<span style="font-size:30px">クリアタイム <b style="color:#EAF6D8">'+fmtTime(elapsed)+'</b></span>'+(winIsBest?' <b style="color:#EAD24E">新記録！</b>':(bestTime!=null?'<br><span style="font-size:12px">ベスト '+fmtTime(bestTime)+'</span>':''));
+    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine+'<br><br><span style="font-size:12px">作った糖：'+tot+"</span>";
+    for(let i=1;i<ps.length;i++) ps[i].style.display="none";
+    document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
+  function denature(){ denLock=0.5; temp=DENATURE_KNOCK; heatE=0; charge=0; combo=0; firing=false; pendingSugar=null; pendingCut={};  // ★温度は55℃まで押し戻す（全リセットはしない）＝少し登り直す程度でゲーム続行。硬直中は温度固定
+    document.getElementById("combo").textContent=0;
+    enzymeLife=Math.max(0, enzymeLife-1); refreshLife();          // 失活で酵素を1つ失う
+    // 失活の手応え（ライフ喪失）を強調：フラッシュ＋大揺れ＋ヒットストップ＋熱そうな赤橙の破片＆湯気＋衝撃波。温度が落ちなくても“失活した”と即分かるように
+    shakeMag=26; flash=.75; hitstop=0.09; fireX=cx(); fireY=cy();
+    beep(70,0.34,"sawtooth",.11); setTimeout(()=>beep(48,0.3,"sawtooth",.10),70);
+    rings.push({x:cx(),y:cy(),r:16,vr:540,w:10,life:1});          // 失活の衝撃波
+    for(let i=0;i<34;i++){ const a=Math.random()*6.28, sp=3+Math.random()*9;   // 赤橙＝焼けた／灰＝失活した酵素のかけら
+      parts.push({x:cx(),y:cy(),vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.8,life:.95,sz:2+Math.random()*3.6,col:["#E4553A","#FF8A3C","#FFD37A","#4a4a44"][i%4],spark:true}); }
+    for(let i=0;i<8;i++){ parts.push({x:cx()+(Math.random()*80-40),y:cy()-10,vx:Math.random()*1.2-.6,vy:-2.4-Math.random()*2,life:1.1,sz:3+Math.random()*3,col:"#C9C2B0",spark:true}); } // 立ちのぼる湯気＝アチチ
+    pops.push({x:cx(),y:cy()-24,txt:"アチチ！失活",life:1.45,col:"#FF5A3C",age:0,sz:46});
+    if(enzymeLife<=0) gameOver(); }
+  function gameOver(reason){ running=false; firing=false; charge=0; shakeMag=20; flash=.7; overReason=reason||"enzyme";
+    const sr=overReason==="sour";
+    beep(180,0.5,"sawtooth",.10); setTimeout(()=>beep(120,0.5,"sawtooth",.10),140); setTimeout(()=>beep(80,0.7,"sawtooth",.10),300);
+    if(sr){ fireX=cx(); fireY=cy();                                // 酸敗：緑〜くすんだ黄の“腐り”破片
+      for(let i=0;i<26;i++){ const a=Math.random()*6.28, sp=2+Math.random()*6;
+        parts.push({x:cx(),y:cy(),vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,life:.9,sz:2+Math.random()*3,col:["#B6C24A","#8A9A3A","#6f7a3a"][i%3],spark:true}); } }
+    pops.push({x:cx(),y:cy()-10,txt:sr?"酸敗して腐った…":"酵素が全部失活…",life:2.4,col:sr?"#B6C24A":"#E4553A",age:0,sz:38});
+    setTimeout(showOverOverlay, 900); }
+  function showOverOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
+    const sr=overReason==="sour";
+    ov.querySelector("h2").textContent= sr?"酸敗…":"ゲームオーバー";
+    const frac=totalStarch?Math.round((1-starch.length/totalStarch)*100):0;
+    const tot=SUGARS.map(s=>s.name+' <b style="color:'+s.col+'">'+(sugarStock[s.key]||0)+'</b>').join('　');
+    const lead= sr?"低温が続いて酸敗してしまった…":"酵素がすべて失活してしまった…";
+    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=lead+"<br>分解 <b>"+frac+"%</b><br><span style=\"font-size:12px\">作った糖："+tot+"</span>";
+    for(let i=1;i<ps.length;i++) ps[i].style.display="none";
+    document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
+
+  // ---- 六角形グルコース君 ----
+  function hexPath(x,y,s,rot){ ctx.save(); ctx.translate(x,y); ctx.rotate(rot||0); ctx.beginPath();
+    for(let i=0;i<6;i++){ const a=-Math.PI/2+i*Math.PI/3; ctx.lineTo(Math.cos(a)*s, Math.sin(a)*s*1.02); } ctx.closePath(); }
+  const cl255=v=>v<0?0:v>255?255:v|0;                               // 玉ごとの色個体差：toneで暖(+赤/−青)⇄寒、lumで明暗を微小に振る（±閾下）
+  const toneStop=(r,g,b,tone,lum)=>{ const L=lum*7; return "rgb("+cl255(r+tone*12+L)+","+cl255(g+tone*2+L)+","+cl255(b-tone*11+L)+")"; };
+  function makeGrad(s,tone,lum){ const g=ctx.createRadialGradient(-s*.2,-s*.3,0,0,0,s);   // 玉のドーム状グラデ。玉ごとに一度だけ作ってu.gradにキャッシュ→毎フレーム生成を廃止（重さの主因）
+    g.addColorStop(0,toneStop(244,207,233,tone,lum)); g.addColorStop(.65,toneStop(224,169,209,tone,lum)); g.addColorStop(1,toneStop(192,131,182,tone,lum)); return g; }
+  // 玉“本体”（グラデ塗り＋奥ゆき陰＋輪郭＋目）は毎フレーム不変→オフスクリーンに一度だけ焼いて、本編ではdrawImageで貼る（毎フレームのパス塗り/グラデ生成を全廃＝スマホでの主負荷を除去）。口とtintは状態で変わるので本編側で軽く重ねる
+  function bakeBody(u){ const s=u.s, pad=3, R=s+pad, size=Math.max(1,Math.ceil(R*2*DPR));
+    const c=document.createElement("canvas"); c.width=size; c.height=size;
+    const g=c.getContext("2d"); g.setTransform(DPR,0,0,DPR,0,0); g.translate(R,R);
+    g.beginPath(); for(let i=0;i<6;i++){ const a=-Math.PI/2+i*Math.PI/3; g.lineTo(Math.cos(a)*s, Math.sin(a)*s*1.02); } g.closePath();
+    const gr=g.createRadialGradient(-s*.2,-s*.3,0,0,0,s);
+    gr.addColorStop(0,toneStop(244,207,233,u.tone,u.lum)); gr.addColorStop(.65,toneStop(224,169,209,u.tone,u.lum)); gr.addColorStop(1,toneStop(192,131,182,u.tone,u.lum));
+    g.fillStyle=gr; g.fill();
+    const shade=(1-u.depth)*0.52; if(shade>0){ g.fillStyle="rgba(24,12,30,"+shade.toFixed(2)+")"; g.fill(); }
+    g.lineWidth=2; g.strokeStyle="#8f5f88"; g.stroke();               // 熱い時の赤輪郭は本編のtintオレンジで代替
+    g.fillStyle="#4a2f47"; const ex=s*.34, ey=s*.05, er=s*.12;         // 目（常に同じ）
+    g.beginPath(); g.arc(-ex,-ey,er,0,7); g.arc(ex,-ey,er,0,7); g.fill();
+    u.spr=c; u.sprR=R; }
+  function drawUnit(x,y,s,rot,face,scared,tint,shade,tone,lum,grad){ tint=tint||0; shade=shade||0; tone=tone||0; lum=lum||0;
+    hexPath(x,y,s,rot);
+    ctx.fillStyle = grad || makeGrad(s,tone,lum); ctx.fill();        // gradが渡されればキャッシュ済みを再利用（フィールドの玉）／無ければ生成（飛散分子など少数）
+    if(shade>0){ ctx.fillStyle="rgba(24,12,30,"+shade.toFixed(2)+")"; ctx.fill(); }   // 奥ほど暗く＝立体の陰
+    if(tint>0){ ctx.fillStyle="rgba(255,120,45,"+(tint*0.6).toFixed(2)+")"; ctx.fill(); }
+    ctx.lineWidth=2; ctx.strokeStyle= tint>0.6?"#C0392B":"#8f5f88"; ctx.stroke();
+    // 顔
+    ctx.fillStyle="#4a2f47"; const ey=s*.05, ex=s*.34, er=s*.12;
+    ctx.beginPath(); ctx.arc(-ex,-ey,er,0,7); ctx.arc(ex,-ey,er,0,7); ctx.fill();
+    ctx.strokeStyle="#4a2f47"; ctx.lineWidth=2; ctx.beginPath();
+    if(scared){ ctx.arc(0,s*.34,s*.16,Math.PI,0,true); } else if(face===1){ ctx.arc(0,s*.2,s*.14,.1,Math.PI-.1); } else { ctx.moveTo(-s*.16,s*.3); ctx.lineTo(s*.16,s*.3); }
+    ctx.stroke(); ctx.restore();
+  }
+
+  // ---- ループ ----
+  let last=performance.now();
+  function frame(now){ let dt=Math.min(.05,(now-last)/1000); last=now;
+    const rdt = hitstop>0 ? 0 : dt; if(hitstop>0) hitstop-=dt;
+
+    if(running){
+      const spd=Math.min(rawMove, MOVE_CAP); rawMove=0; moved=0; dbgSpd=spd;   // 擦り量＝指の実移動（往復でも円でもOK）
+      if(!moveStarted){                                         // ★最初の一擦りまで待機：タイマー0・適温バンド静止（開始直後にいきなり始まらない）
+        runStart=now;                                           // 待機中はタイマー原点を今に固定＝経過0のまま
+        if(spd>2) moveStarted=true;                             // 初回スクラブで始動
+      }
+      elapsed=(now-runStart)/1000;                            // タイムアタックの経過時間
+      if(spd>2) idleT=0; else idleT+=dt;                       // 手を離している時間（長いほど下降が加速）
+      if(moveStarted){                                          // 適温バンドの漂い/突発ダッシュは始動後だけ動かす
+        // 適温バンドの中心zCをゆっくり漂わせる（モメンタム付きランダムウォーク／両端で反射）＝擦りの単純化を防ぐ揺らぎ
+        // 突発ダッシュ：ときどき適温がいきなり別の帯へ素早く飛ぶ（低分子でまったり→急に高分子、など）＝崖リスクを取って追うか読み合い
+        dashT-=dt;
+        if(dashT<=0 && dashHold<=0){
+          const r=Math.random(); let tgt, isLo=false;             // 高40%/中26%/低(グルコース側)34%＝低温側も定期的に誘う
+          if(r<0.40) tgt=66+Math.random()*3.3;                    // 高分子側へ“誘い”
+          else if(r<0.66) tgt=62.5+Math.random()*2;
+          else { tgt=57.5+Math.random()*2.5; isLo=true; }         // グルコース帯へ。長めに滞在＝温度が追いつく猶予（低温糖を作れるように）
+          zVel = Math.max(-DASH_V, Math.min(DASH_V, (tgt-zC)*4)); dashDir=Math.sign(zVel);
+          dashHold = (isLo?0.7:0.45)+Math.random()*0.35; dashT = DASH_MIN+Math.random()*(DASH_MAX-DASH_MIN);
+          if(tgt>66) beep(920,0.08,"square",.028);                // 高分子への誘いに短い合図
+        }
+        if(dashHold>0) dashHold-=dt; else dashDir=0;
+        const zmul=Z_MUL_LO+(Z_MUL_HI-Z_MUL_LO)*Math.max(0,Math.min(1,(zC-Z_SLO)/(Z_SHI-Z_SLO)));  // 高温ほど速い＝逃げる
+        zVel += ((Math.random()-0.5)*Z_NOISE*zmul + (Z_BIAS-zC)*Z_PULL)*dt;
+        zVel*=Math.pow(Z_DAMP,dt);
+        const zmv = dashHold>0 ? Math.max(Z_MAXV*zmul, DASH_V) : Z_MAXV*zmul;   // ダッシュ中は速度上限を解放
+        zVel=Math.max(-zmv,Math.min(zmv,zVel)); zC+=zVel*dt;
+        if(zC<Z_MIN){ zC=Z_MIN; zVel=Math.abs(zVel)*0.5; } if(zC>Z_MAX){ zC=Z_MAX; zVel=-Math.abs(zVel)*0.5; }
+      }
+      if(firing){ fireT-=dt; if(fireT<=0){ shred(); } }        // 発火の寸止め → ズタッ
+      else if(rdt>0){
+        const _t0=temp;                                        // 失活の硬直中に温度を固定するための退避
+        const inZone = Math.abs(temp-zC)<=ZW && temp<DENATURE;  // 揺らぐ狭い適温バンドの中だけ発火できる＝常に微調整
+        // 冷却レート（放物運動）：離した直後はゆるやか、DROP_DELAY秒を過ぎると重力項(二次)で加速して床へ落下
+        const ie = Math.max(0, idleT-DROP_DELAY);
+        const coolRate = Math.min(GCOOL + idleT*COOL_ACCEL + ie*ie*COOL_GRAV, COOL_MAX);
+        const hspd = spd*(activeTouch?TOUCH_HEAT_MUL:1);         // 加熱に使う擦り量（タッチは底上げ）。仕事量charge/しきい値判定は素のspdのまま＝発火や始動の感覚は不変
+        if(inZone){
+          temp += Math.min(hspd*HEAT_BASE*GREEN_EFF, GCAP*rdt);  // 擦るほど上がるが上限つき＝暴走しない（GCAPで頭打ち＝底上げしても崖へ暴走しない）
+          temp -= coolRate*rdt;                                  // 手を離すほど加速して下降
+          heatE=0;                                               // 余熱を持ち越さない（グライド暴発を防ぐ）
+        } else {
+          let eff;                                               // バンド外の擦り効き：下は登って追いつける／バンドより上は崖へ加熱（危険）
+          if(temp<WALL0) eff=0.5+(temp-START_T)/(WALL0-START_T)*0.5;
+          else if(temp<GREEN[0]){ const k=(temp-WALL0)/(GREEN[0]-WALL0); eff=WALL_HI+(WALL_LO-WALL_HI)*k; }
+          else if(temp<zC) eff=0.42;
+          else eff=OVER_EFF;
+          heatE += hspd*HEAT_BASE*eff;
+          const ap=heatE*Math.min(1,rdt*MOM); temp+=ap; heatE-=ap;
+          temp=Math.max(START_T, temp-coolRate*rdt);            // 落下は床(20℃)まで引き継ぐ
+        }
+        aimT=temp+heatE;
+        if(denLock>0){ denLock-=rdt; temp=_t0; aimT=temp; }     // 失活の硬直中は温度を固定（押し戻した55℃のまま＝硬直中の冷却で酸敗域に落ちない）
+        else if(temp>DENATURE){ denature(); }                   // 崖：73℃で失活
+        else if(starch.length && inZone){                       // 崖手前まで、擦った“仕事量”が1ストローク分たまると発火＝でんぷんを削る
+          charge += spd; if(charge>=SHRED_WORK){ charge=0; startFiring(); }
+        } else { charge=Math.max(0, charge-rdt*40); }           // ゾーン外/塊なしでは仕事は少しずつ抜ける
+      }
+      // 落下の“ヒュン”：急降下し始めた瞬間に一度だけ笛＋落下ストリーク
+      const dropV=(prevTemp-temp)/Math.max(dt,0.001);
+      if(spd>2 || temp<=START_T+1){ whooshed=false; }
+      else if(!firing && !whooshed && dropV>52 && temp>START_T+3){ whooshed=true; whooshSound();
+        for(let i=0;i<16;i++) parts.push({x:cx()+(Math.random()*180-90), y:cy()-110+Math.random()*50,
+          vx:(Math.random()*1.2-.6), vy:9+Math.random()*8, life:.65, sz:1.4+Math.random()*1.6, col:"#BFEAE0", streak:true}); }
+      // 危険帯(64〜70)：崖が近いほど強く速まる鼓動
+      if(!firing && temp>GREEN[1] && temp<DENATURE){ const prox=(temp-GREEN[1])/(DENATURE-GREEN[1]);
+        dangerBeatT-=dt; if(dangerBeatT<=0){ dangerBeat(prox); dangerBeatT=0.52-prox*0.34; } }
+      else dangerBeatT=0;
+      // 酸敗リスク：50℃(SOUR_T)を下回ると酸敗ゲージが増える（低温ほど速い）／50℃以上で回復。満タンでゲームオーバー
+      if(temp>=GREEN[0]) sourArmed=true;                          // 一度でも発火ゾーンに到達したら作動（開始の登坂は猶予）
+      if(sourArmed && !firing && temp<SOUR_T){                    // 54℃未満で酸度がジワジワ上がる（不可逆＝戻らない）。低温ほど速い
+        const cold=1+(SOUR_T-temp)/(SOUR_T-START_T)*(SOUR_COLD-1);
+        const before=sour; sour=Math.min(1, sour+SOUR_RATE*cold*dt);
+        if(Math.floor(sour*3)>Math.floor(before*3)) beep(300+Math.floor(sour*3)*90,0.07,"square",.04);  // 1/3ラインを越えるたび短い警告音＝“酸度が上がった”手応え
+        if(sour>=1){ sour=1; gameOver("sour"); }
+      }
+      prevTemp=temp;
+    }
+    // パーティクル
+    for(const p of parts){ p.life-=dt*(p.spark?1.6:1.1); p.vy+=(p.spark?12:18)*dt; p.x+=p.vx; p.y+=p.vy; if(p.hex||p.mol){p.rot+=p.vr;} }  // 分子も勢いよく飛び散る（減速なし）
+    parts=parts.filter(p=>p.life>0);
+    for(const q of pops){ q.life-=dt*1.1; q.y-=dt*30; q.age=(q.age||0)+dt; } pops=pops.filter(q=>q.life>0);
+    for(const r of rings){ r.life-=dt*1.8; r.r+=r.vr*dt; } rings=rings.filter(r=>r.life>0);
+    for(const s of snaps){ s.life-=dt/0.28; } snaps=snaps.filter(s=>s.life>0);
+    if(bloom>0) bloom-=dt*4.2;
+    if(shakeMag>0.2){ shakeMag*=Math.pow(0.001,dt); shakeX=(Math.random()*2-1)*shakeMag; shakeY=(Math.random()*2-1)*shakeMag; } else {shakeX=shakeY=0;}
+    if(flash>0) flash-=dt*3;
+
+    render();
+    const dbg=document.getElementById("dbg");
+    if(dbg) dbg.textContent=`温度 ${temp.toFixed(1)}  ちぎり ${(charge/SHRED_WORK*100).toFixed(0)}%  ${temp>=GREEN[0]&&temp<=GREEN[1]?'適温':(temp>GREEN[1]?'危':'')}`;
+    dbgSpd=0;
+    requestAnimationFrame(frame);
+  }
+
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.save(); ctx.translate(shakeX,shakeY);
+
+    // 予感：温度が上がるほど震え、揺らぐ適温バンド内で糖色に光り、危険域(64超え)で赤く暴れて崖を煽る
+    const inGreen = Math.abs(temp-zC)<=ZW && temp<DENATURE;   // 揺らぐ適温バンドの中か
+    const heatT=Math.max(0,Math.min(1,(temp-START_T)/(DENATURE-START_T)));
+    const dz=Math.max(0,Math.min(1,(temp-GREEN[1])/(DENATURE-GREEN[1])));  // はみ出し帯64→70 0→1（崖の予感）
+    const fp = firing ? (1-fireT/WINDUP) : 0;   // 発火寸止めの進み 0→1
+    // 加熱ムード：適温バンド内に入ると“今の適温で出来る糖”の色にフィールドが染まる（登り中は金の予熱）。発火寸止めで破壊点が灯る
+    const madeSugar=sugarAt(zC);
+    if(starch.length){
+      if(inGreen){ ctx.fillStyle=hexA(madeSugar.col, 0.16); ctx.fillRect(0,0,W,H); }
+      else { ctx.fillStyle=hexA("#E0B24A", (.02+heatT*.06)); ctx.fillRect(0,0,W,H); }
+      if(firing){ const gl=ctx.createRadialGradient(fireX,fireY,0,fireX,fireY,Math.min(W,H)*(0.16+fp*0.14));
+        gl.addColorStop(0,`rgba(255,240,190,${(.35+fp*.45).toFixed(2)})`); gl.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=gl; ctx.fillRect(0,0,W,H); }
+    }
+    if(starch.length){
+      const cN=Math.min(1,charge/SHRED_WORK);   // 擦って“壊す仕事”が溜まるほど全体が震える＝自分で崩している手応え
+      const jit=reduce?0:(heatT*heatT*3 + (inGreen?3:0) + cN*cN*5 + dz*dz*8 + fp*7);
+      const tint=firing?1:(temp>GREEN[1]?0.9:(inGreen?0.7:heatT*0.7)), scared=heatT>0.5||inGreen||firing;
+      const byId={}; for(const u of starch) byId[u.id]=u;
+      // ①各玉の位置を確定。発火中、壊される玉は破壊点(fireX,fireY)へ引き寄せられ激しく震える
+      const spr=1+heatT*0.07;                                     // 加熱で分子が押し合って少し広がる＝隠れていた結合線が現れる
+      for(const u of starch){ u.ph+=firing?0.9:0.3;
+        let bx=cx()+u.ox*spr, by=cy()+u.oy*spr;
+        const cutting=firing&&pendingCut[u.id], jj=jit*(cutting?3.2:1);
+        if(cutting){ const g=fp*0.22; bx+=(fireX-bx)*g; by+=(fireY-by)*g; }
+        u._x=bx+Math.sin(u.ph*3)*jj; u._y=by+Math.cos(u.ph*2.3)*jj; }
+      // ②玉本体を先に描く（＝結合線を“上”に重ねられるように）。縁(奥/暗)→中心(手前/明)の重なりでドーム状の立体
+      const drawOrder=starch.slice().sort((a,b)=>a.depth-b.depth);
+      const shrink=1-fp*0.18;                                        // 発火寸止めで全体が少し縮む
+      // ②-a 本体スプライトをdrawImageで貼る（焼き済み＝グラデ塗り/陰/輪郭/目を再計算しない）。発火の縮みと微小回転だけ本編で
+      for(const u of drawOrder){ const R=u.sprR*shrink, rot=Math.sin(u.ph)*0.06;
+        ctx.save(); ctx.translate(u._x,u._y); if(rot) ctx.rotate(rot);
+        ctx.drawImage(u.spr, -R, -R, R*2, R*2); ctx.restore(); }
+      // ②-b 加熱tint（オレンジ）：全玉の六角を1パスにまとめて一度だけ塗る（玉ごとの塗りを廃止）。微小回転は無視できるので世界座標で頂点計算
+      if(tint>0){ ctx.beginPath();
+        for(const u of drawOrder){ const s=u.s*shrink, x=u._x, y=u._y;
+          for(let i=0;i<6;i++){ const a=-Math.PI/2+i*Math.PI/3, px=x+Math.cos(a)*s, py=y+Math.sin(a)*s*1.02; i?ctx.lineTo(px,py):ctx.moveTo(px,py); } ctx.closePath(); }
+        ctx.fillStyle="rgba(255,120,45,"+(tint*0.6).toFixed(2)+")"; ctx.fill(); }
+      // ②-c 口：状態(scared/face)で変わるので毎フレーム。全玉を1パスにまとめて一括stroke（微小回転は無視）
+      ctx.strokeStyle="#4a2f47"; ctx.lineWidth=2; ctx.lineCap="round"; ctx.beginPath();
+      for(const u of drawOrder){ const s=u.s*shrink, x=u._x, y=u._y;
+        if(scared){ ctx.moveTo(x-s*.16, y+s*.34); ctx.arc(x, y+s*.34, s*.16, Math.PI, 0, true); }
+        else if(u.face===1){ ctx.moveTo(x+Math.cos(.1)*s*.14, y+s*.2+Math.sin(.1)*s*.14); ctx.arc(x, y+s*.2, s*.14, .1, Math.PI-.1); }
+        else { ctx.moveTo(x-s*.16, y+s*.3); ctx.lineTo(x+s*.16, y+s*.3); } }
+      ctx.stroke();
+      // ③でんぷん鎖の結合＝細い線を“玉の上＝格子の継ぎ目”に重ねる（ぴっちりでも隠れない）。加熱の早い段階から現れ、熱いほど濃い暖色に張り詰めて細く。切る線は赤バツ
+      const rv=Math.max(0,Math.min(1,(temp-36)/(54-36)));           // 見え始めを早めるランプ（36℃で0→54℃で全開＝発火よりかなり前に構造が見える）
+      ctx.lineCap="round";
+      // 通常の結合は全部同じスタイル→1本のパスにまとめて一括stroke（結合数ぶんのstroke呼び出しを1回に＝大幅軽量化）
+      { const h=heatT, cr=(214+41*h*0.9)|0, cg=(178-58*h*0.9)|0, cb=(206-136*h*0.9)|0;   // 色・太さの張り=heatT（崖に近いほど暖色・細く）／見え方=rv(早め)
+        ctx.strokeStyle=`rgba(${cr},${cg},${cb},${(0.1+rv*0.68).toFixed(2)})`; ctx.lineWidth=Math.max(0.7, 1.6-h*0.8);
+        ctx.beginPath();
+        for(const bd of bonds){ if(firing&&(pendingCut[bd.a]||pendingCut[bd.b])) continue;   // 切る線は下で個別に
+          const a=byId[bd.a], b=byId[bd.b]; if(!a||!b) continue; ctx.moveTo(a._x,a._y); ctx.lineTo(b._x,b._y); }
+        ctx.stroke(); }
+      // 切る線（発火中のみ・少数）＝赤い線＋切断点の赤バツ予告を個別描画
+      if(firing){ for(const bd of bonds){ if(!(pendingCut[bd.a]||pendingCut[bd.b])) continue;
+        const a=byId[bd.a], b=byId[bd.b]; if(!a||!b) continue;
+        ctx.strokeStyle=`rgba(228,85,58,${(0.6+fp*0.4).toFixed(2)})`; ctx.lineWidth=2.2+fp*2.2;
+        ctx.beginPath(); ctx.moveTo(a._x,a._y); ctx.lineTo(b._x,b._y); ctx.stroke();
+        const mx=(a._x+b._x)/2, my=(a._y+b._y)/2, s=3+fp*7;
+        ctx.strokeStyle="#FF5A3C"; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.moveTo(mx-s,my-s); ctx.lineTo(mx+s,my+s); ctx.moveTo(mx+s,my-s); ctx.lineTo(mx-s,my+s); ctx.stroke(); } }
+    }
+    // はみ出し帯(64〜70)＝崖の予感：画面ふちが茶色く締まってヒリつく（緩めれば戻れる）
+    if(temp>GREEN[1] && !firing){
+      const v=ctx.createRadialGradient(cx(),cy(),Math.min(W,H)*0.18,cx(),cy(),Math.max(W,H)*0.6);
+      v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,`rgba(170,80,50,${(.1+dz*.45).toFixed(2)})`);
+      ctx.fillStyle=v; ctx.fillRect(0,0,W,H); }
+    // 酸敗の予感(54℃未満)：画面ふちがくすんだ黄緑に沈む＝酸度が上がっていく。ゲージが溜まるほど濃く＋脈動
+    if(sourArmed && temp<SOUR_T && !firing){
+      const pulse=0.6+0.4*Math.sin(performance.now()/100);
+      const v=ctx.createRadialGradient(cx(),cy(),Math.min(W,H)*0.18,cx(),cy(),Math.max(W,H)*0.62);
+      v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,`rgba(150,165,60,${(.1+sour*.32+pulse*.08).toFixed(2)})`);
+      ctx.fillStyle=v; ctx.fillRect(0,0,W,H); }
+    // 破壊点ブルーム（発火の閃光の芯）＆ 衝撃波リング
+    if(bloom>0){ const br=Math.min(W,H)*(0.12+(1-bloom)*0.34);
+      const bg=ctx.createRadialGradient(fireX,fireY,0,fireX,fireY,br);
+      bg.addColorStop(0,`rgba(255,250,236,${(bloom*0.9).toFixed(3)})`); bg.addColorStop(.5,`rgba(255,222,150,${(bloom*0.4).toFixed(3)})`); bg.addColorStop(1,"rgba(255,200,120,0)");
+      ctx.fillStyle=bg; ctx.fillRect(0,0,W,H); }
+    for(const r of rings){ ctx.globalAlpha=Math.max(0,r.life)*0.85; ctx.strokeStyle="#FFE7C0";
+      ctx.lineWidth=Math.max(.5,r.w*r.life); ctx.beginPath(); ctx.arc(r.x,r.y,r.r,0,7); ctx.stroke(); }
+    ctx.globalAlpha=1;
+    // 千切れた結合の“パンッ”：切断点から両端へ半分ずつ弾け戻る（＝線が切れる瞬間がハッキリ見える）
+    ctx.lineCap="round";
+    for(const s of snaps){ const t=1-s.life, mx=(s.ax+s.bx)/2, my=(s.ay+s.by)/2;
+      const fax=mx+(s.ax-mx)*t, fay=my+(s.ay-my)*t, fbx=mx+(s.bx-mx)*t, fby=my+(s.by-my)*t;
+      ctx.globalAlpha=Math.max(0,s.life);
+      ctx.strokeStyle=`rgba(255,${(120+120*s.life)|0},${(90*s.life)|0},1)`; ctx.lineWidth=3.2*s.life+0.6;
+      ctx.beginPath(); ctx.moveTo(s.ax,s.ay); ctx.lineTo(fax,fay); ctx.moveTo(s.bx,s.by); ctx.lineTo(fbx,fby); ctx.stroke();
+      if(s.life>0.55){ ctx.fillStyle=`rgba(255,255,235,${((s.life-0.55)/0.45).toFixed(2)})`;
+        ctx.beginPath(); ctx.arc(mx,my,4.8*s.life,0,7); ctx.fill(); } }
+    ctx.globalAlpha=1;
+    // パーティクル
+    for(const p of parts){ ctx.globalAlpha=Math.max(0,p.life);
+      if(p.mol){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); const k=Math.max(.45,Math.min(1,p.life)); ctx.lineCap="round"; ctx.lineJoin="round";
+        if(p.closed){                                             // 三角/五角の“面”を半透明で塗る＝形が一目で分かる
+          ctx.fillStyle=hexA(p.col,.4); ctx.beginPath();
+          for(let i=0;i<p.units.length;i++){ const u=p.units[i]; i?ctx.lineTo(u.dx*k,u.dy*k):ctx.moveTo(u.dx*k,u.dy*k); } ctx.closePath(); ctx.fill();
+          ctx.strokeStyle=hexA(p.col,.9); ctx.lineWidth=3.2; ctx.stroke(); }
+        if(p.units.length>1){                                     // 連結棒（糖の色）＝辺。closedなら多角形に閉じる
+          ctx.strokeStyle=hexA(p.col,.5); ctx.lineWidth=12*k; ctx.beginPath();
+          for(let i=0;i<p.units.length;i++){ const u=p.units[i]; i?ctx.lineTo(u.dx*k,u.dy*k):ctx.moveTo(u.dx*k,u.dy*k); } if(p.closed)ctx.closePath(); ctx.stroke();
+          ctx.strokeStyle=p.col; ctx.lineWidth=6*k; ctx.beginPath();
+          for(let i=0;i<p.units.length;i++){ const u=p.units[i]; i?ctx.lineTo(u.dx*k,u.dy*k):ctx.moveTo(u.dx*k,u.dy*k); } if(p.closed)ctx.closePath(); ctx.stroke();
+        } else { const u=p.units[0]; ctx.fillStyle=hexA(p.col,.42); ctx.beginPath(); ctx.arc(u.dx*k,u.dy*k,u.s*k*1.45,0,7); ctx.fill(); }  // 単体グルコースは色のハロー
+        for(const u of p.units) drawUnit(u.dx*k,u.dy*k, u.s*k, 0, u.face, true, 0); ctx.restore(); }
+      else if(p.hex){ drawUnit(p.x,p.y,p.sz*Math.max(.3,p.life),p.rot,p.face,true,0.45); }
+      else if(p.streak){ ctx.strokeStyle=p.col; ctx.lineWidth=p.sz; ctx.lineCap="round";
+        ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-p.vx*2.2,p.y-p.vy*2.4); ctx.stroke(); }
+      else { ctx.fillStyle=p.col; ctx.beginPath(); ctx.arc(p.x,p.y,p.sz,0,7); ctx.fill(); }
+    }
+    ctx.globalAlpha=1;
+    // ポップ文字：ドンッと出て弾んで落ち着く（オーバーシュート）＋縁取りで抜ける
+    for(const q of pops){ const a=q.age||0;
+      const sc = a<0.11 ? (a/0.11)*1.28 : (a<0.2 ? 1.28-(a-0.11)/0.09*0.28 : 1);
+      ctx.globalAlpha=Math.max(0,q.life); ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.save(); ctx.translate(q.x,q.y); ctx.scale(sc,sc);
+      ctx.font=`800 ${q.sz||34}px 'Hiragino Kaku Gothic ProN',sans-serif`;
+      ctx.lineWidth=5; ctx.lineJoin="round"; ctx.strokeStyle="rgba(50,18,8,.65)"; ctx.strokeText(q.txt,0,0);
+      ctx.fillStyle=q.col; ctx.fillText(q.txt,0,0); ctx.restore();
+    } ctx.globalAlpha=1; ctx.textBaseline="alphabetic";
+
+    drawGauge();
+    drawSourGauge();
+    drawProgress();
+    ctx.restore();
+    drawTimer();
+    if(flash>0){ ctx.fillStyle=`rgba(255,255,255,${flash*0.5})`; ctx.fillRect(0,0,W,H); }
+  }
+  function drawTimer(){                                           // タイムアタック（主軸）：上中央に経過時間、下にベスト
+    ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+    ctx.font="800 22px ui-monospace,Menlo,Consolas,monospace"; ctx.fillStyle="rgba(243,234,219,.94)";
+    ctx.fillText(fmtTime(elapsed), W*0.5, 30);
+    if(bestTime!=null){ ctx.font="700 11px ui-monospace,monospace"; ctx.fillStyle="rgba(234,210,78,.9)";
+      ctx.fillText("BEST "+fmtTime(bestTime), W*0.5, 45); }
+  }
+
+  function drawProgress(){                                     // 画面下：でんぷんをどれだけ分解したか
+    if(!totalStarch) return; const frac=1-starch.length/totalStarch;
+    const bx=14, bw=W-72, bh=7, by=H-16;
+    round(bx,by,bw,bh,4); ctx.fillStyle="rgba(255,255,255,.10)"; ctx.fill();
+    if(frac>0){ round(bx,by,Math.max(bh,bw*frac),bh,4); ctx.fillStyle=frac>=1?"#9BD26F":"#7FBE5A"; ctx.fill(); }
+    ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+    ctx.fillStyle="rgba(255,255,255,.62)"; ctx.font="700 11px ui-monospace,monospace";
+    ctx.fillText("分解 "+Math.round(frac*100)+"%", bx, by-5); }
+
+  function drawSourGauge(){                                      // 酸敗ゲージ（左端の縦バー）：下から溜まる＝酸度がジワジワ上がる感覚。不可逆。満タンでGO。1/3ごとの目安ライン付き
+    if(!running && sour<=0.001) return;
+    const gx=14, gw=13, top=24, bot=H-28, gh=bot-top;             // 温度計と揃えた“全高の左レール”＝左右対称のフレーム
+    round(gx-3, top-3, gw+6, gh+6, 6); ctx.fillStyle="rgba(18,14,7,.55)"; ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.14)"; ctx.lineWidth=1; ctx.stroke();
+    const lv=Math.max(0,Math.min(1,sour)), fh=gh*lv, mid=lv>0.33, hi=lv>0.66;
+    // 液（緑→橙→赤へ段階的に・満タン近くで脈動）＋液面ハイライト
+    if(fh>0){ round(gx, bot-fh, gw, fh, 4);
+      const topC= hi?"#E4553A":(mid?"#E0A24A":"#B6C24A"), botC= hi?"#8A2A1B":"#6f7a2f";
+      const g=ctx.createLinearGradient(0,bot-fh,0,bot); g.addColorStop(0,topC); g.addColorStop(1,botC);
+      const pulse= hi ? 0.7+0.3*Math.sin(performance.now()/110) : 1;
+      ctx.fillStyle=g; ctx.globalAlpha=pulse; ctx.fill(); ctx.globalAlpha=1;
+      ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(gx+1,bot-fh+0.5); ctx.lineTo(gx+gw-1,bot-fh+0.5); ctx.stroke(); }
+    // 1/3・2/3の目安ライン（“だいたい3回のミス”の目安を視覚化）
+    ctx.strokeStyle="rgba(255,255,255,.22)"; ctx.lineWidth=1;
+    for(let k=1;k<3;k++){ const y=bot-gh*(k/3); ctx.beginPath(); ctx.moveTo(gx,y); ctx.lineTo(gx+gw,y); ctx.stroke(); }
+    // 現在上昇中＝液面の上に向きの矢印
+    if(sourArmed && temp<SOUR_T && running){ const ay=bot-fh; ctx.fillStyle= hi?"#E4553A":"#C7D24E";
+      ctx.beginPath(); ctx.moveTo(gx+gw/2, ay-8); ctx.lineTo(gx+gw/2-5, ay-2); ctx.lineTo(gx+gw/2+5, ay-2); ctx.closePath(); ctx.fill(); }
+    // ラベル
+    ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+    ctx.fillStyle= hi?"#E4553A":"rgba(230,224,200,.78)"; ctx.font="800 11px 'Hiragino Kaku Gothic ProN',sans-serif";
+    ctx.fillText("酸", gx+gw/2, top-13); ctx.fillText("敗", gx+gw/2, top-2);
+  }
+  function drawGauge(){                                          // 昔ながらの棒状温度計（バルブ＋ガラス管に赤い液柱）＋横に色目盛り
+    const tx=W-24, tw=15, top=22, bulbR=16, bulbY=H-24, bot=bulbY-bulbR+6, gh=bot-top;
+    const yOf=t=>bot-(Math.max(TLO,Math.min(THI,t))-TLO)/(THI-TLO)*gh;
+    const stripX=tx-tw/2-13, sw=7;                              // 横の“印刷された色目盛り板”
+    const fy=yOf(temp), zTop=yOf(zC+ZW), zBot=yOf(zC-ZW), zCol=sugarAt(zC).col;
+
+    // ① 色帯（壁/糖4色/崖上）＝スケール板
+    ctx.fillStyle="rgba(150,140,120,.30)"; ctx.fillRect(stripX,yOf(GREEN[0]),sw,yOf(WALL0)-yOf(GREEN[0]));
+    for(const s of SUGARS){ ctx.fillStyle=hexA(s.col,.55); ctx.fillRect(stripX,yOf(s.hi),sw,yOf(s.lo)-yOf(s.hi)); }
+    ctx.fillStyle="rgba(200,70,55,.6)"; ctx.fillRect(stripX,yOf(THI),sw,yOf(DENATURE)-yOf(THI));
+    ctx.strokeStyle="rgba(255,255,255,.18)"; ctx.lineWidth=1; ctx.strokeRect(stripX+.5,yOf(THI)+.5,sw-1,bot-yOf(THI)-1);
+
+    // ② ガラス管→バルブの順に（バルブが管の下端を隠す）
+    ctx.lineJoin="round"; ctx.fillStyle="rgba(236,240,245,.10)"; ctx.strokeStyle="rgba(255,255,255,.38)"; ctx.lineWidth=2;
+    round(tx-tw/2, top, tw, bulbY-top, tw/2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(tx,bulbY,bulbR,0,7); ctx.fill(); ctx.stroke();
+
+    // ③ 赤い液：現在温度までの液柱＋バルブ。崖付近は濃い赤
+    const lw=tw-7, liq=temp>=DENATURE?"#FF3B25":"#E24A33", liqD="#A82A1B";
+    const g=ctx.createLinearGradient(tx-lw/2,0,tx+lw/2,0); g.addColorStop(0,liqD); g.addColorStop(.45,liq); g.addColorStop(1,liqD);
+    ctx.fillStyle=g;
+    round(tx-lw/2, fy, lw, bulbY-fy, lw/2); ctx.fill();          // 液柱（頂点は丸いメニスカス）
+    ctx.beginPath(); ctx.arc(tx,bulbY,bulbR-3,0,7); ctx.fill();  // バルブの液
+    // ガラスのハイライト
+    ctx.strokeStyle="rgba(255,255,255,.45)"; ctx.lineWidth=2; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(tx-tw/2+3.5, top+7); ctx.lineTo(tx-tw/2+3.5, bulbY-8); ctx.stroke();
+    // ③b ガラス管の刻み目盛り（右縁に短く：メジャー10℃/マイナー5℃）＝温度計らしさ。液柱は横切らない
+    ctx.lineCap="butt";
+    for(let t=Math.ceil(TLO/5)*5; t<=THI; t+=5){ const y=yOf(t), major=t%10===0;
+      ctx.strokeStyle= major?"rgba(255,255,255,.6)":"rgba(255,255,255,.32)"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(tx+tw/2-(major?6:3.2), y); ctx.lineTo(tx+tw/2-0.5, y); ctx.stroke(); }
+
+    // ④ 揺らぐ適温バンド＝色目盛りの上に明るいマーカー＋ダッシュ矢印
+    ctx.fillStyle=hexA(zCol,.92); round(stripX-3, zTop, sw+6, zBot-zTop, 3); ctx.fill();
+    ctx.strokeStyle= dashHold>0?"#FFF6D8":"#fff"; ctx.lineWidth= dashHold>0?3:1.5; ctx.stroke();
+    if(dashHold>0 && dashDir!==0){ const up=dashDir>0, cxm=stripX+sw/2, ay=(up?zTop-4:zBot+4), tip=(up?ay-8:ay+8);
+      ctx.fillStyle=zCol; ctx.beginPath(); ctx.moveTo(cxm,tip); ctx.lineTo(cxm-6,ay); ctx.lineTo(cxm+6,ay); ctx.closePath(); ctx.fill(); }
+
+    // ⑤ 目盛り・数字（色目盛りの左）
+    ctx.textAlign="right"; ctx.textBaseline="alphabetic";
+    for(let t=20;t<=70;t+=10){ const y=yOf(t);
+      ctx.strokeStyle="rgba(255,255,255,.3)"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(stripX-4,y); ctx.lineTo(stripX-1,y); ctx.stroke();
+      ctx.fillStyle="rgba(255,255,255,.55)"; ctx.font="600 10px ui-monospace,monospace"; ctx.fillText(t, stripX-6, y+3.5); }
+    { const y=yOf(DENATURE); ctx.strokeStyle="#E4553A"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(stripX-4,y); ctx.lineTo(stripX+sw,y); ctx.stroke();
+      ctx.fillStyle="#E4553A"; ctx.font="700 11px sans-serif"; ctx.fillText(DENATURE+"℃ 崖", stripX-6, y-3); }
+    ctx.font="800 11px 'Hiragino Kaku Gothic ProN',sans-serif";
+    const snm=sugarAt(zC).name, sny=(zTop+zBot)/2, snw=ctx.measureText(snm).width;
+    round(stripX-11-snw, sny-9, snw+9, 17, 5); ctx.fillStyle="rgba(20,14,8,.74)"; ctx.fill();   // 結晶に被っても読めるよう背景チップ
+    ctx.textAlign="right"; ctx.textBaseline="alphabetic"; ctx.fillStyle=zCol; ctx.fillText(snm, stripX-6, sny+4);
+
+    // ⑥ 着地予測マーカー（管の右）
+    if(running && !firing && aimT>temp+0.8){ const ay=yOf(aimT), inG=Math.abs(aimT-zC)<=ZW;
+      ctx.fillStyle=inG?"#EAF6D8":(aimT>=DENATURE?"#E4553A":"rgba(255,255,255,.7)");
+      ctx.beginPath(); ctx.moveTo(tx+tw/2+4,ay); ctx.lineTo(tx+tw/2+12,ay-6); ctx.lineTo(tx+tw/2+12,ay+6); ctx.closePath(); ctx.fill(); }
+  }
+  function round(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  spawnField(); requestAnimationFrame(frame);
+})();
+</script>
