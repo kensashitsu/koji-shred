@@ -32,6 +32,14 @@
   .foot{display:flex; align-items:center; gap:12px; color:var(--ink2); font-size:12px}
   .foot .big{font-size:15px; color:var(--ink); font-weight:800; display:inline-block; transform-origin:center bottom; transition:transform .13s cubic-bezier(.2,1.7,.4,1), color .13s}
   .foot .sp{margin-left:auto}
+  .hud{display:flex; align-items:center; gap:12px}
+  .hud-time{display:flex; align-items:baseline; gap:7px}
+  .hud-time #timer{font:800 22px ui-monospace,Menlo,Consolas,monospace; color:var(--ink); letter-spacing:.01em; font-variant-numeric:tabular-nums}
+  .hud-time #besttime{font:700 11px ui-monospace,monospace; color:var(--accent)}
+  .hud-prog{flex:1; display:flex; align-items:center; gap:8px}
+  .hud-prog .bar{flex:1; height:7px; border-radius:4px; background:rgba(255,255,255,.10); overflow:hidden}
+  .hud-prog .bar i{display:block; height:100%; width:0%; background:var(--green); border-radius:4px; transition:width .18s linear}
+  .hud-prog #progpct{font:700 11px ui-monospace,monospace; color:var(--ink2); min-width:4.8em; text-align:right; font-variant-numeric:tabular-nums}
   .overlay{position:absolute; inset:0; display:grid; place-items:center; background:rgba(20,14,8,.72); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); z-index:5; text-align:center; padding:24px; overflow:auto}
   .overlay[hidden]{display:none}
   .overlay h2{margin:0 0 8px; font-size:24px}
@@ -45,7 +53,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v111｜v110ベース】模式図フィールドを縦の帯いっぱいに：真円キャップを撤廃し縦長楕円（最大1.6:1）で生成＝上下の余白も使用。結合長Lは節数150でその楕円を埋める密度に算出</span>
+    <span class="hint">【v112｜v111ベース】糖ストック削除／タイム・分解率をプレイ枠外(上部DOM)へ／チュートリアル背景の分子を初回そのままプレイ(introField)／上下マージン圧縮＋楕円1.85:1で分子を縦に拡張</span>
   </header>
   <div class="foot">
     <span>酵素 <span class="life" id="life"></span></span>
@@ -53,7 +61,10 @@
     <span>ベスト <span class="big" id="best">0</span></span>
     <span class="sp" id="mute">🔊</span>
   </div>
-  <div class="sugars" id="sugars"></div>
+  <div class="hud">
+    <div class="hud-time"><b id="timer">0:00.0</b><span id="besttime"></span></div>
+    <div class="hud-prog"><div class="bar"><i id="progfill"></i></div><span id="progpct">分解 0%</span></div>
+  </div>
   <div class="stage" id="stage">
     <canvas id="cv"></canvas>
     <div id="dbg" style="position:absolute;top:8px;left:10px;z-index:6;pointer-events:none;font:700 12px ui-monospace,Menlo,Consolas,monospace;color:#8fe3c8;text-shadow:0 1px 2px rgba(0,0,0,.6)"></div>
@@ -138,9 +149,10 @@
   let firing=false, fireT=0, curN=STARCH_N;
   let shakeX=0,shakeY=0,shakeMag=0, flash=0, bloom=0;
   let starch=[], parts=[], pops=[], rings=[], bonds=[], snaps=[];
+  let introField=true;   // 初回start()はチュートリアル背景で見えている分子をそのままプレイ（再生成しない＝見えているもの＝プレイするもの）。「もう一度」以降は新規生成
   let prevTemp=START_T, whooshed=false, dangerBeatT=0, pendingCut={};
   // でんぷんの塊は「左＝酸敗ゲージ／右＝温度計／上＝タイマー／下＝進捗バー」に挟まれた帯の“中央”に置く（重なり＆片寄り防止）
-  const FIELD_L=42, FIELD_R=74, FIELD_T=50, FIELD_B=40;           // 各UIを避けるための内側マージン（右は糖名を背景チップ化して詰めた）
+  const FIELD_L=42, FIELD_R=74, FIELD_T=22, FIELD_B=22;           // 各UIを避ける内側マージン（タイム/分解率をDOM＝枠外へ出したので上下を詰め、分子を縦に広げられる）
   const fieldRx=()=>Math.min(W*0.46, (W-FIELD_L-FIELD_R)/2 - 6);
   const fieldRy=()=>Math.min(fieldRx()*1.02, (H-FIELD_T-FIELD_B)/2 - 6);  // ほぼ真円（縦長エッグは不評＝丸をキープ。上下余白は全高レールが枠として受ける）
   const cx=()=>(FIELD_L + (W-FIELD_R))/2;                          // 帯の水平中央（酸敗ゲージと温度計の内側の中点）
@@ -150,7 +162,7 @@
   function spawnField(){   // ★デンプンの化学模式図（アミロペクチン＝幹α1-4＋枝α1-6の樹状重合体）を種から成長。節数は固定GLUCOSE_Nで、枝ぶり・うねりだけ毎回ランダム＝毎ゲーム違う分子だが削る量は一定
     starch=[]; bonds=[]; let id=0;
     const rx=fieldRx();
-    const ry=Math.min((H-FIELD_T-FIELD_B)/2 - 16, rx*1.6);        // ★縦の帯を使う（真円キャップを撤廃）＝上下エリアも生成に使う。細長すぎ防止に1.6:1で上限
+    const ry=Math.min((H-FIELD_T-FIELD_B)/2 - 10, rx*1.85);       // ★縦の帯を使う（真円キャップを撤廃）＝上下エリアも生成に使う。プレイ枠が広がった分やや縦長（1.85:1上限）
     const N=GLUCOSE_N;
     const L=Math.sqrt(Math.PI*rx*ry/(N*2.0)); latticeD=L;         // 結合長：節数Nでこの縦長楕円を程よく埋める間隔（密度感K=2.0＝サンプルと同等）＝縦にも広がる
     const s=L*0.42;                                                // 節(六角)の半径＝結合長より小さく＝隙間に結合線が見える模式図
@@ -268,7 +280,8 @@
     parts=[]; pops=[]; rings=[]; snaps=[]; pendingCut={}; pendingSugar=null; resetSugar(); zC=Z_MID; zVel=0;
     enzymeLife=MAX_LIFE; refreshLife(); runStart=performance.now(); elapsed=0; winIsBest=false;
     dashT=DASH_MIN+Math.random()*(DASH_MAX-DASH_MIN); dashHold=0; dashDir=0; sour=0; sourArmed=false; overReason="enzyme"; moveStarted=false;
-    document.getElementById("combo").textContent=0; document.getElementById("ov").hidden=true; spawnField(); }
+    document.getElementById("combo").textContent=0; document.getElementById("ov").hidden=true;
+    if(introField){ introField=false; } else { spawnField(); } }   // 初回はチュートリアルで見えている分子をそのままプレイ／2回目以降だけ新規生成
 
   function startFiring(){ firing=true; fireT=WINDUP; windupSound();
     pendingSugar=sugarAt(zC);                                        // 今の適温の位置で出来る糖を確定（発熱前）→ dp で壊す量が決まる
@@ -653,27 +666,17 @@
 
     drawGauge();
     drawSourGauge();
-    drawProgress();
     ctx.restore();
-    drawTimer();
+    updateHud();
     if(flash>0){ ctx.fillStyle=`rgba(255,255,255,${flash*0.5})`; ctx.fillRect(0,0,W,H); }
   }
-  function drawTimer(){                                           // タイムアタック（主軸）：上中央に経過時間、下にベスト
-    ctx.textAlign="center"; ctx.textBaseline="alphabetic";
-    ctx.font="800 22px ui-monospace,Menlo,Consolas,monospace"; ctx.fillStyle="rgba(243,234,219,.94)";
-    ctx.fillText(fmtTime(elapsed), W*0.5, 30);
-    if(bestTime!=null){ ctx.font="700 11px ui-monospace,monospace"; ctx.fillStyle="rgba(234,210,78,.9)";
-      ctx.fillText("BEST "+fmtTime(bestTime), W*0.5, 45); }
+  function updateHud(){                                           // タイム・分解率はプレイ枠の外＝画面上部のDOMに表示（canvasには描かない）
+    const t=document.getElementById("timer"); if(t) t.textContent=fmtTime(elapsed);
+    const bt=document.getElementById("besttime"); if(bt) bt.textContent = bestTime!=null ? "BEST "+fmtTime(bestTime) : "";
+    const frac = totalStarch ? 1-starch.length/totalStarch : 0;
+    const pf=document.getElementById("progfill"); if(pf) pf.style.width=(frac*100).toFixed(1)+"%";
+    const pp=document.getElementById("progpct"); if(pp) pp.textContent="分解 "+Math.round(frac*100)+"%";
   }
-
-  function drawProgress(){                                     // 画面下：でんぷんをどれだけ分解したか
-    if(!totalStarch) return; const frac=1-starch.length/totalStarch;
-    const bx=14, bw=W-72, bh=7, by=H-16;
-    round(bx,by,bw,bh,4); ctx.fillStyle="rgba(255,255,255,.10)"; ctx.fill();
-    if(frac>0){ round(bx,by,Math.max(bh,bw*frac),bh,4); ctx.fillStyle=frac>=1?"#9BD26F":"#7FBE5A"; ctx.fill(); }
-    ctx.textAlign="left"; ctx.textBaseline="alphabetic";
-    ctx.fillStyle="rgba(255,255,255,.62)"; ctx.font="700 11px ui-monospace,monospace";
-    ctx.fillText("分解 "+Math.round(frac*100)+"%", bx, by-5); }
 
   function drawSourGauge(){                                      // 酸敗ゲージ（左端の縦バー）：下から溜まる＝酸度がジワジワ上がる感覚。不可逆。満タンでGO。1/3ごとの目安ライン付き
     if(!running && sour<=0.001) return;
