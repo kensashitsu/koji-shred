@@ -40,14 +40,20 @@
   .btn{margin-top:18px; border:none; cursor:pointer; font-family:inherit; font-weight:800; font-size:17px; color:#241a08;
     background:var(--accent); padding:14px 32px; border-radius:12px; box-shadow:0 5px 0 #9c7a1e; transition:transform .07s}
   .btn:active{transform:translateY(3px); box-shadow:0 2px 0 #9c7a1e}
-  @media (max-width:560px){ header .hint{display:none} header h1{font-size:22px} .overlay h2{font-size:22px} .overlay p{font-size:13.5px} }
+  @media (max-width:560px){ header{display:none} .overlay h2{font-size:22px} .overlay p{font-size:13.5px} }
 </style>
 
 <div class="wrap">
   <header>
-    <h1>ズタッ！</h1>
-    <span class="hint">【v107｜v106ベース】タッチ加熱の底上げ：入力がタッチの時だけ加熱倍率TOUCH_HEAT_MUL=1.9（マウスは1.0＝据置）。小画面で擦り距離を稼げない問題を解消。同一運動で温度上昇が実測1.7倍
+    <span class="hint">【v108｜v107ベース】スマホUI移動：糖ストック・酵素ライフ等のステータスを画面下部→上部へ（擦る手で隠れて見えない問題を解消）。上部タイトル「ズタッ！」表示は撤去</span>
   </header>
+  <div class="foot">
+    <span>酵素 <span class="life" id="life"></span></span>
+    <span>連続 <span class="big" id="combo">0</span></span>
+    <span>ベスト <span class="big" id="best">0</span></span>
+    <span class="sp" id="mute">🔊</span>
+  </div>
+  <div class="sugars" id="sugars"></div>
   <div class="stage" id="stage">
     <canvas id="cv"></canvas>
     <div id="dbg" style="position:absolute;top:8px;left:10px;z-index:6;pointer-events:none;font:700 12px ui-monospace,Menlo,Consolas,monospace;color:#8fe3c8;text-shadow:0 1px 2px rgba(0,0,0,.6)"></div>
@@ -62,13 +68,6 @@
         <button class="btn" id="start">はじめる</button>
       </div>
     </div>
-  </div>
-  <div class="sugars" id="sugars"></div>
-  <div class="foot">
-    <span>酵素 <span class="life" id="life"></span></span>
-    <span>連続 <span class="big" id="combo">0</span></span>
-    <span>ベスト <span class="big" id="best">0</span></span>
-    <span class="sp" id="mute">🔊</span>
   </div>
 </div>
 
