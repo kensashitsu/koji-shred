@@ -45,7 +45,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v109｜v108ベース】タッチ発火の底上げ：発火のcharge蓄積もタッチ時だけTOUCH_CHARGE_MUL=1.5倍＝全消しまでの総ストローク数を減らし手の疲れを軽減（マウスは1.0＝据置）</span>
+    <span class="hint">【v110｜v109ベース】でんぷんを化学模式図に刷新：六角格子→アミロペクチン（枝分かれ重合体）を種から成長生成。節数は固定GLUCOSE_N=150（タイム公平）、枝ぶり・うねりは毎ゲーム自動ランダム。削りは現行pickCut（近い順）を許容</span>
   </header>
   <div class="foot">
     <span>酵素 <span class="life" id="life"></span></span>
@@ -93,6 +93,7 @@
     {key:"dex", name:"デキストリン",     lo:66.5, hi:73,   col:"#E4883C", dp:5},
   ];
   const MOL_PER_FIRE=4;                           // 1発火で作る“分子の数”。ちぎれる玉数＝dp×これ（分子が大きいほど沢山ちぎれる）
+  const GLUCOSE_N=150;                            // ★でんぷんのグルコース節数＝毎回固定（タイムアタックの削る量を一定に）。枝ぶり・うねりだけ毎回ランダム。将来200も検討
   const CIRC=['','①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
   const MAX_LIFE=3;                               // 酵素ライフ。崖(失活)ごとに1つ失い、ゼロでゲームオーバー
   function sugarAt(t){ for(const s of SUGARS) if(t>=s.lo && t<s.hi) return s; return SUGARS[t>=70?3:0]; }
@@ -146,27 +147,40 @@
   const cy=()=>(FIELD_T + (H-FIELD_B))/2;                          // 帯の垂直中央
 
   let latticeD=0;
-  function spawnField(){                                          // 六角格子（結晶パック）。放射状ライティングでドーム状の陰影＝平坦さ解消。冷たいうちは線が隠れた結晶の塊
-    starch=[]; let id=0;
-    const rx=fieldRx(), ry=fieldRy(), N=210;                       // 帯の中央に収まる丸い結晶チップ（両ゲージに重ならない）
-    const d=Math.sqrt(Math.PI*rx*ry/(0.866*N)); latticeD=d;        // 格子間隔（目標数Nから算出）
-    const s60=Math.sqrt(3)/2, base=d*0.58;                         // 密着する六角サイズ（ぴっちり）
-    let row=0;
-    for(let y=-ry; y<=ry+1e-6; y+=d*s60){ const xoff=(row&1)*d/2;  // 六角配列（奇数行を半ピッチずらす）
-      for(let x=-rx+xoff; x<=rx+1e-6; x+=d){
-        const rn=Math.sqrt((x*x)/(rx*rx)+(y*y)/(ry*ry)); if(rn>1) continue;   // 楕円の内側だけ＝きれいな輪郭
-        const depth=Math.max(0,Math.min(1, 1 - 0.5*rn + (Math.random()-0.5)*0.08));   // 中心=明るく手前／縁=暗く奥＝ドーム状の陰影＆重なりで立体に
-        starch.push({id:id++, ox:x, oy:y, s:base*(0.9+Math.random()*0.2), depth, ph:Math.random()*6.28, face:(Math.random()*3|0),
-          tone:(Math.random()+Math.random()-1), lum:(Math.random()+Math.random()-1)});   // 玉ごとの微小な色個体差（暖⇄寒・明⇄暗）＝均一ピンクを有機的な斑に。三角分布で中央寄り
-
-      } row++; }
-    totalStarch=starch.length; for(const u of starch) bakeBody(u);   // 本体スプライトを各玉ぶん一度だけ焼く（以降はdrawImageで貼るだけ）
-    buildBonds(); }
-  function buildBonds(){                                          // 密：格子の近傍を全部つなぐ＝三角/ハニカムの結晶格子（構造図らしさ）
-    bonds=[]; const th2=(latticeD*1.18)*(latticeD*1.18);
-    for(let i=0;i<starch.length;i++){ const u=starch[i];
-      for(let j=i+1;j<starch.length;j++){ const v=starch[j]; const dx=u.ox-v.ox, dy=u.oy-v.oy;
-        if(dx*dx+dy*dy<th2) bonds.push({a:u.id, b:v.id}); } } }
+  function spawnField(){   // ★デンプンの化学模式図（アミロペクチン＝幹α1-4＋枝α1-6の樹状重合体）を種から成長。節数は固定GLUCOSE_Nで、枝ぶり・うねりだけ毎回ランダム＝毎ゲーム違う分子だが削る量は一定
+    starch=[]; bonds=[]; let id=0;
+    const rx=fieldRx(), ry=fieldRy(), N=GLUCOSE_N;
+    const L=fieldRx()*0.12; latticeD=L;                            // 結合長（グルコース節の間隔）
+    const s=L*0.42;                                                // 節(六角)の半径＝結合長より小さく＝隙間に結合線が見える模式図
+    const minD2=(L*0.82)*(L*0.82);
+    const inside=(x,y)=> (x*x)/(rx*rx)+(y*y)/(ry*ry) <= 1;         // 楕円フィールドの内側だけに置く
+    const collide=(x,y)=>{ for(const u of starch){ const dx=u.ox-x, dy=u.oy-y; if(dx*dx+dy*dy<minD2) return true; } return false; };  // 自己回避＝読める樹形
+    const add=(x,y)=>{ starch.push({id, ox:x, oy:y, s, depth:0.9+Math.random()*0.1, ph:Math.random()*6.28,
+      face:(Math.random()*3|0), tone:(Math.random()+Math.random()-1), lum:(Math.random()+Math.random()-1)}); return id++; };
+    const curl=0.30+Math.random()*0.55, branchP=0.05+Math.random()*0.15;   // ★毎回ランダム：うねり・枝分かれ確率
+    const sx=(Math.random()-0.5)*rx*0.3, sy=(Math.random()-0.5)*ry*0.3, a0=Math.random()*6.28;
+    const seed=add(sx,sy);
+    const tips=[ {x:sx,y:sy,prev:seed,dir:a0,depth:0}, {x:sx,y:sy,prev:seed,dir:a0+Math.PI,depth:0} ];   // 幹は両方向へ
+    let guard=0; const GMAX=N*140;
+    while(starch.length<N && guard++<GMAX){
+      if(tips.length===0){                                        // 全枝が行き止まり→既存ノードから再出芽して必ずNへ（＝節数固定を保証、連結も維持）
+        let re=false;
+        for(let t=0;t<30;t++){ const bi=(Math.random()*starch.length)|0, b=starch[bi], dir=Math.random()*6.28;
+          const nx=b.ox+Math.cos(dir)*L, ny=b.oy+Math.sin(dir)*L;
+          if(inside(nx,ny)&&!collide(nx,ny)){ tips.push({x:b.ox,y:b.oy,prev:b.id,dir,depth:1}); re=true; break; } }
+        if(!re) break; continue;
+      }
+      const tip=tips[0]; let ok=false, nd, nx, ny;
+      for(let tryi=0; tryi<6; tryi++){ nd=tip.dir+(Math.random()-0.5)*curl*2+(tryi?(Math.random()-0.5)*1.5:0);
+        nx=tip.x+Math.cos(nd)*L; ny=tip.y+Math.sin(nd)*L; if(inside(nx,ny)&&!collide(nx,ny)){ ok=true; break; } }
+      if(!ok){ tips.shift(); continue; }
+      const idx=add(nx,ny); bonds.push({a:tip.prev, b:idx});      // グリコシド結合＝1本の連結した木（bonds = 節数-1）
+      tip.x=nx; tip.y=ny; tip.prev=idx; tip.dir=nd;
+      if(tip.depth<3 && Math.random()<branchP){ const bd=nd+(Math.random()<0.5?1:-1)*(0.7+Math.random()*0.6);
+        tips.push({x:nx,y:ny,prev:idx,dir:bd,depth:tip.depth+1}); }
+    }
+    totalStarch=starch.length; for(const u of starch) bakeBody(u);   // 本体スプライトを各節ぶん一度だけ焼く
+  }
 
   // ---- 音 ----
   let AC=null,muted=false;
