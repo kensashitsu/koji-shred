@@ -45,7 +45,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v108｜v107ベース】スマホUI移動：糖ストック・酵素ライフ等のステータスを画面下部→上部へ（擦る手で隠れて見えない問題を解消）。上部タイトル「ズタッ！」表示は撤去</span>
+    <span class="hint">【v109｜v108ベース】タッチ発火の底上げ：発火のcharge蓄積もタッチ時だけTOUCH_CHARGE_MUL=1.5倍＝全消しまでの総ストローク数を減らし手の疲れを軽減（マウスは1.0＝据置）</span>
   </header>
   <div class="foot">
     <span>酵素 <span class="life" id="life"></span></span>
@@ -107,6 +107,7 @@
   // 擦り→発熱の効き（温度帯で変化）：序盤ふつう→壁は上ほど重い→適温はホバー可→はみ出し帯は放置で崖へ
   const HEAT_BASE=0.03, WALL_HI=0.6, WALL_LO=0.14, OVER_EFF=1.0;
   const TOUCH_HEAT_MUL=1.9;   // スマホ(タッチ)は画面が小さく1往復で稼げる擦り距離がPCマウスより少ない＋速い往復で1F上限に当たり切り捨てられがち→タッチ時だけ加熱の効きをこの倍率で底上げ（マウスは1.0＝“丁度よかった”手触りを維持）
+  const TOUCH_CHARGE_MUL=1.5;  // 同じ理由で発火の“擦り仕事量”charge蓄積もタッチ時だけ底上げ＝全消しまでの総ストローク数を減らし手の疲れを軽減（加熱1.9より控えめ＝1発ごとに自分で刻む手応えは残す。マウスは1.0＝据置）
   // 適温帯：擦り加熱（上限GCAP＝雑に強く擦ると一気に崖へ）＋ 発火ごとに発熱FIRE_HEAT（連発するほど崖に近づく）
   const GREEN_EFF=0.6, GCAP=40, FIRE_HEAT=2.5;
   // 冷却（放物運動イメージ）：離した直後はGCOOL＋時間×COOL_ACCELのゆるい下降、DROP_DELAY秒を過ぎると重力項(二次)でどんどん加速して20℃の床へ落下
@@ -467,7 +468,7 @@
         if(denLock>0){ denLock-=rdt; temp=_t0; aimT=temp; }     // 失活の硬直中は温度を固定（押し戻した55℃のまま＝硬直中の冷却で酸敗域に落ちない）
         else if(temp>DENATURE){ denature(); }                   // 崖：73℃で失活
         else if(starch.length && inZone){                       // 崖手前まで、擦った“仕事量”が1ストローク分たまると発火＝でんぷんを削る
-          charge += spd; if(charge>=SHRED_WORK){ charge=0; startFiring(); }
+          charge += spd*(activeTouch?TOUCH_CHARGE_MUL:1); if(charge>=SHRED_WORK){ charge=0; startFiring(); }
         } else { charge=Math.max(0, charge-rdt*40); }           // ゾーン外/塊なしでは仕事は少しずつ抜ける
       }
       // 落下の“ヒュン”：急降下し始めた瞬間に一度だけ笛＋落下ストリーク
