@@ -59,12 +59,25 @@
   .btn{margin-top:18px; border:none; cursor:pointer; font-family:inherit; font-weight:800; font-size:17px; color:#241a08;
     background:var(--accent); padding:14px 32px; border-radius:12px; box-shadow:0 5px 0 #9c7a1e; transition:transform .07s}
   .btn:active{transform:translateY(3px); box-shadow:0 2px 0 #9c7a1e}
+  .overlay .kun{display:block; margin:0 auto 4px; filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
+  .btnrow{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
+  .btnrow .btn{margin-top:0}
+  .btn.ghost{background:transparent; color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset; padding:14px 22px}
+  .btn.ghost:active{transform:translateY(2px); box-shadow:0 0 0 2px var(--accent) inset}
+  .coach{position:absolute; left:12px; right:12px; bottom:12px; z-index:7; display:flex; align-items:center; gap:10px;
+    background:rgba(20,14,8,.94); border:1px solid var(--accent); border-radius:14px; padding:12px 13px; box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .coach[hidden]{display:none}
+  .coach #coachtxt{flex:1; font-size:13px; line-height:1.5; color:var(--ink)}
+  .coach #coachtxt b{color:var(--accent)}
+  .coachbtn{flex:none; cursor:pointer; border:none; font-family:inherit; font-weight:800; font-size:14px; color:#241a08;
+    background:var(--accent); padding:9px 15px; border-radius:10px; box-shadow:0 3px 0 #9c7a1e}
+  .coachbtn:active{transform:translateY(2px); box-shadow:0 1px 0 #9c7a1e}
   @media (max-width:560px){ header{display:none} .overlay h2{font-size:22px} .overlay p{font-size:13.5px} }
 </style>
 
 <div class="wrap">
   <header>
-    <span class="hint">【v124｜v123ベース】チュートリアル背景はデンプン非表示（空の盤面）／破裂音のdp差を強調（音量.41→1.0・爆発レイヤーglu0→dex4発）／生成完了まで擦っても開始不可／ホーム画面アイコン(icon.png)＋manifest＋apple-mobile-web-app-title=アミラーＺ</span>
+    <span class="hint">【v125｜v124ベース】スタート画面にグルコース君イラスト追加／「あそびかた」でプレイ画面上の操作説明チュートリアル(コーチ吹き出し5ステップ・失活/酸敗しても続行)／酸敗中に警告音を繰り返し＋「⚠酸敗中」表示</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -80,15 +93,25 @@
     <div id="dbg" style="position:absolute;top:8px;left:10px;z-index:6;pointer-events:none;font:700 12px ui-monospace,Menlo,Consolas,monospace;color:#8fe3c8;text-shadow:0 1px 2px rgba(0,0,0,.6)"></div>
     <div class="overlay" id="ov">
       <div>
+        <svg class="kun" viewBox="0 0 110 110" width="92" height="92" aria-hidden="true">
+          <defs><radialGradient id="gk" cx="38%" cy="34%" r="66%">
+            <stop offset="0" stop-color="#f9dbee"/><stop offset=".55" stop-color="#eab9d5"/><stop offset=".86" stop-color="#cf90c9"/><stop offset="1" stop-color="#a86ba0"/>
+          </radialGradient></defs>
+          <polygon points="55,9.2 91.4,30.6 91.4,73.4 55,94.8 18.6,73.4 18.6,30.6" fill="url(#gk)" stroke="rgba(120,78,112,.6)" stroke-width="3" stroke-linejoin="round"/>
+          <ellipse cx="34" cy="62" rx="8" ry="6.5" fill="rgba(233,120,150,.35)"/><ellipse cx="76" cy="62" rx="8" ry="6.5" fill="rgba(233,120,150,.35)"/>
+          <circle cx="42" cy="50" r="6" fill="#42283f"/><circle cx="68" cy="50" r="6" fill="#42283f"/>
+          <path d="M44 60 Q55 72 66 60" fill="none" stroke="#42283f" stroke-width="4.5" stroke-linecap="round"/>
+        </svg>
         <h2>アミラーＺ</h2>
         <p><b>①</b> 画面を<b>ゆびでゴシゴシ</b>こする＝温まる（<b>速く往復</b>するほど熱い）<br>
         <b>②</b> 右の温度計が<b>適温の帯</b>で擦ると<b>でんぷんが糖に</b>。<b>全部こわせばクリア！</b><br>
         <b>③</b> 熱くしすぎると<b>酵素が失活</b>（3つで終了）。<b>アツくなったら手を止めて冷ませ。</b><br>
-        <b>④</b> でも<b>冷やしすぎもNG</b>。<b>54℃を下回ると酸敗ゲージ</b>（左）がジワジワ上昇＝<b>戻らない</b>。<b>満タンでゲームオーバー</b>。</p>
+        <b>④</b> でも<b>冷やしすぎもNG</b>。<b>54℃を下回ると酸敗ゲージ</b>（上）がジワジワ上昇＝<b>戻らない</b>。<b>満タンでゲームオーバー</b>。</p>
         <p style="font-size:12px">※片道スワイプでは温まらない／適温はゆらゆら動くので追いかけて</p>
-        <button class="btn" id="start">はじめる</button>
+        <div class="btnrow"><button class="btn" id="start">はじめる</button><button class="btn ghost" id="tut">あそびかた</button></div>
       </div>
     </div>
+    <div class="coach" id="coach" hidden><span id="coachtxt"></span><button class="coachbtn" id="coachnext">次へ</button></div>
   </div>
 </div>
 
@@ -153,6 +176,8 @@
   let combo=0, best=0, respawn=0, totalStarch=0, fireX=0, fireY=0, sugarStock={}, zC=Z_MID, zVel=0, pendingSugar=null, enzymeLife=MAX_LIFE;
   let runStart=0, elapsed=0, bestTime=null, winIsBest=false, dashT=3, dashHold=0, dashDir=0;
   let sour=0, sourArmed=false, overReason="enzyme";               // 酸敗ゲージ(0..1・不可逆)／作動フラグ(57℃到達で真)／敗因
+  let sourSndT=0;                                                 // 酸敗中サウンドの再生間隔タイマー
+  let tutMode=false, tutStep=0;                                   // 操作説明チュートリアル（プレイ画面上でコーチ吹き出し・失活/酸敗しても続行＝安全に練習）
   try{ const b=localStorage.getItem('kojiShredBest'); if(b) bestTime=parseFloat(b); }catch(e){}
   (function(){ const d=document.getElementById("dbg"); if(d) d.style.display="none"; })();   // デバッグ表示は隠す（スコアHUDを出すため）
   function fmtTime(s){ s=Math.max(0,s); const m=Math.floor(s/60), sec=s-m*60; return m+":"+(sec<10?"0":"")+sec.toFixed(1); }
@@ -246,6 +271,13 @@
       for(let i=0;i<c2.length;i++) c2[i]=(Math.random()*2-1)*Math.pow(1-i/c2.length,1.6);
       const s2=a2.createBufferSource(); s2.buffer=b2; const lp2=a2.createBiquadFilter(); lp2.type="lowpass"; lp2.frequency.value=800+k*220;
       const g2=a2.createGain(); g2.gain.value=0.24; s2.connect(lp2); lp2.connect(g2); g2.connect(a2.destination); s2.start(t2); }, 45+k*52); } }
+  function sourSound(){ if(muted)return; const a=ac(); if(!a)return;   // 酸敗中の不穏な低い“ブクッ…”＝腐敗が進む警告。酸敗レベルが上がるほど濃く高く
+    const now=a.currentTime;
+    const o=a.createOscillator(), g=a.createGain(); o.type="sawtooth";
+    o.frequency.setValueAtTime(140+sour*70, now); o.frequency.exponentialRampToValueAtTime(62, now+0.19);
+    const lp=a.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=460+sour*320;
+    g.gain.setValueAtTime(0.0001, now); g.gain.linearRampToValueAtTime(0.05+sour*0.06, now+0.03); g.gain.exponentialRampToValueAtTime(0.0001, now+0.24);
+    o.connect(lp); lp.connect(g); g.connect(a.destination); o.start(now); o.stop(now+0.26); }
   function windupSound(){ if(muted)return; const a=ac(); if(!a)return; // 頂点へ張り詰める上昇音
     const o=a.createOscillator(),g=a.createGain(); o.type="sawtooth"; const n=a.currentTime;
     o.frequency.setValueAtTime(320,n); o.frequency.exponentialRampToValueAtTime(1250,n+WINDUP);
@@ -301,6 +333,24 @@
   stage.addEventListener("pointerleave", endPointer);
   stage.addEventListener("touchmove", e=>{ if(running) e.preventDefault(); }, {passive:false});  // ゴシゴシ中のスクロール/ラバーバンドを抑止
   document.getElementById("start").addEventListener("click", ()=>{ const a=ac(); if(a&&a.state==="suspended"){ try{ a.resume(); }catch(_){} } start(); });
+  // ---- 操作説明チュートリアル（プレイ画面上でコーチ吹き出し／失活・酸敗しても続行＝安全に練習）----
+  const TUT_STEPS=[
+    "① 画面を指で<b>ゴシゴシ往復</b>してこすってみよう🔥 右の温度計が上がるよ（速いほど熱い／片道はダメ）",
+    "② 温度計の<b>緑の“適温バンド”</b>で擦ると、でんぷんが<b>糖に切れて</b>いく。帯はゆらゆら動くので追いかけて。<b>分解100%でクリア！</b>",
+    "③ <b>熱くしすぎ注意！</b> 73℃（崖）で酵素が<b>失活（アチチ）</b>。アツくなったら<b>手を止めて</b>冷まそう",
+    "④ <b>冷やしすぎもNG。</b> 54℃を下回ると<b>酸敗中</b>に…上の酸敗ゲージが溜まり満タンでアウト（戻らない）",
+    "これで準備OK！ ボタンで<b>本番スタート</b> 🎉",
+  ];
+  function showCoach(){ const c=document.getElementById("coach"); if(!c)return;
+    document.getElementById("coachtxt").innerHTML=TUT_STEPS[tutStep];
+    document.getElementById("coachnext").textContent = tutStep>=TUT_STEPS.length-1 ? "スタート！" : "次へ ▶"; c.hidden=false; }
+  function startTutorial(){ tutMode=true; tutStep=0; start(); growT=1; showCoach(); }   // 生成アニメは飛ばして即操作できるように
+  function coachNext(){ tutStep++;
+    if(tutStep>=TUT_STEPS.length){ document.getElementById("coach").hidden=true; tutMode=false; start(); }  // 本番開始（start()が酵素/酸敗/フィールドをリセット）
+    else showCoach(); }
+  document.getElementById("tut").addEventListener("click", ()=>{ const a=ac(); if(a&&a.state==="suspended"){ try{ a.resume(); }catch(_){} } startTutorial(); });
+  document.getElementById("coachnext").addEventListener("click", coachNext);
+  document.getElementById("coach").addEventListener("pointerdown", e=>e.stopPropagation());   // コーチ上のタップをstageの擦り処理に奪わせない（preventDefault/captureでボタンclickが死ぬのを防ぐ）
   document.getElementById("mute").addEventListener("click", e=>{ muted=!muted; e.currentTarget.textContent=muted?"🔇":"🔊"; });
 
   (function buildChips(){ const el=document.getElementById("sugars"); if(!el) return;
@@ -427,7 +477,7 @@
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
     document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
   function denature(){ denLock=0.5; temp=DENATURE_KNOCK; heatE=0; charge=0; combo=0; firing=false; pendingSugar=null; pendingCut={};  // ★温度は55℃まで押し戻す（全リセットはしない）＝少し登り直す程度でゲーム続行。硬直中は温度固定
-    enzymeLife=Math.max(0, enzymeLife-1); refreshLife();          // 失活で酵素を1つ失う
+    if(!tutMode){ enzymeLife=Math.max(0, enzymeLife-1); refreshLife(); }   // 失活で酵素を1つ失う（チュートリアルでは減らさず＝安全に練習）
     // 失活の手応え（ライフ喪失）を強調：フラッシュ＋大揺れ＋ヒットストップ＋熱そうな赤橙の破片＆湯気＋衝撃波。温度が落ちなくても“失活した”と即分かるように
     shakeMag=26; flash=.75; hitstop=0.09; fireX=cx(); fireY=cy();
     beep(70,0.34,"sawtooth",.11); setTimeout(()=>beep(48,0.3,"sawtooth",.10),70);
@@ -437,7 +487,8 @@
     for(let i=0;i<8;i++){ parts.push({x:cx()+(Math.random()*80-40),y:cy()-10,vx:Math.random()*1.2-.6,vy:-2.4-Math.random()*2,life:1.1,sz:3+Math.random()*3,col:"#C9C2B0",spark:true}); } // 立ちのぼる湯気＝アチチ
     pops.push({x:cx(),y:cy()-24,txt:"アチチ！失活",life:1.45,col:"#FF5A3C",age:0,sz:46});
     if(enzymeLife<=0) gameOver(); }
-  function gameOver(reason){ running=false; firing=false; charge=0; shakeMag=20; flash=.7; overReason=reason||"enzyme";
+  function gameOver(reason){ if(tutMode) return;                  // チュートリアル中はゲームオーバーしない（安全に練習）
+    running=false; firing=false; charge=0; shakeMag=20; flash=.7; overReason=reason||"enzyme";
     const sr=overReason==="sour";
     beep(180,0.5,"sawtooth",.10); setTimeout(()=>beep(120,0.5,"sawtooth",.10),140); setTimeout(()=>beep(80,0.7,"sawtooth",.10),300);
     if(sr){ fireX=cx(); fireY=cy();                                // 酸敗：緑〜くすんだ黄の“腐り”破片
@@ -568,8 +619,9 @@
         const cold=1+(SOUR_T-temp)/(SOUR_T-START_T)*(SOUR_COLD-1);
         const before=sour; sour=Math.min(1, sour+SOUR_RATE*cold*dt);
         if(Math.floor(sour*3)>Math.floor(before*3)) beep(300+Math.floor(sour*3)*90,0.07,"square",.04);  // 1/3ラインを越えるたび短い警告音＝“酸度が上がった”手応え
-        if(sour>=1){ sour=1; gameOver("sour"); }
-      }
+        sourSndT-=dt; if(sourSndT<=0){ sourSound(); sourSndT=0.5; }   // 酸敗中は不穏な音を繰り返し鳴らす（進行が速い低温ほど…は音程で表現）
+        if(sour>=1){ if(tutMode){ sour=0.85; } else { sour=1; gameOver("sour"); } }   // チュートリアルでは満タンでもGOしない（練習）
+      } else { sourSndT=0; }                                        // 酸敗が止まったら即次回すぐ鳴らせるようリセット
       prevTemp=temp;
     }
     // パーティクル
@@ -672,7 +724,13 @@
       const pulse=0.6+0.4*Math.sin(performance.now()/100);
       const v=ctx.createRadialGradient(cx(),cy(),Math.min(W,H)*0.18,cx(),cy(),Math.max(W,H)*0.62);
       v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,`rgba(150,165,60,${(.1+sour*.32+pulse*.08).toFixed(2)})`);
-      ctx.fillStyle=v; ctx.fillRect(0,0,W,H); }
+      ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
+      // 「酸敗中」の警告表示（脈動・酸度が上がるほど赤く）
+      ctx.save(); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.globalAlpha=0.65+0.35*Math.sin(performance.now()/130);
+      const sc=1+0.05*Math.sin(performance.now()/130); ctx.translate(cx(),70); ctx.scale(sc,sc);
+      ctx.font="800 22px 'Hiragino Kaku Gothic ProN',sans-serif"; ctx.lineWidth=5; ctx.lineJoin="round";
+      ctx.strokeStyle="rgba(30,24,8,.7)"; ctx.strokeText("⚠ 酸敗中", 0, 0);
+      ctx.fillStyle= sour>0.66?"#E4553A":(sour>0.33?"#E0A24A":"#C7D24E"); ctx.fillText("⚠ 酸敗中", 0, 0); ctx.restore(); }
     // 破壊点ブルーム（発火の閃光の芯）＆ 衝撃波リング
     if(bloom>0){ const br=Math.min(W,H)*(0.12+(1-bloom)*0.34);
       const bg=ctx.createRadialGradient(fireX,fireY,0,fireX,fireY,br);
