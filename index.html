@@ -57,7 +57,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v120｜v119ベース】結合線を廃止し“みっちり密着”表現へ：節を重ねる(s=0.6L)＋加熱の広がりspr停止。振動を空間コヒーレントな波(隣接節が同位相で一緒に揺れる)にして結合線無しでも隙間が開かないよう対策</span>
+    <span class="hint">【v121｜v120ベース】振動を各節individualなバズに戻す（ユーザー好み）。密着(s=0.6L)・結合線なし・spr停止は維持。加熱時に隙間が開くのは許容</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -575,7 +575,6 @@
       const byId={}; for(const u of starch) byId[u.id]=u;
       // ①各玉の位置を確定。発火中、壊される玉は破壊点(fireX,fireY)へ引き寄せられ激しく震える
       const KST=200, KDMP=Math.pow(0.0012,rdt), KMAX=latticeD*2.0; // 衝撃波の変位バネ（一度膨らんで数回揺れて戻る）／最大変位クランプ
-      const wt=performance.now()*0.009;                           // 振動の“波”の時間項（空間コヒーレント＝隣接節が一緒に動く→結合線無しでも隙間が開かない）
       for(const u of starch){ u.ph+=firing?0.9:0.3;
         u.kvx=(u.kvx-u.kx*KST*rdt)*KDMP; u.kvy=(u.kvy-u.ky*KST*rdt)*KDMP;   // バネ：変位を0へ引き戻し＋減衰
         u.kx+=u.kvx*rdt; u.ky+=u.kvy*rdt;
@@ -584,8 +583,7 @@
         let bx=cx()+u.ox+u.kx, by=cy()+u.oy+u.ky;                 // 加熱の広がりsprは廃止（結合線を出す必要がなくなった＝密着維持）。衝撃変位kx/kyは加算
         const cutting=firing&&pendingCut[u.id], jj=jit*(cutting?3.2:1);
         if(cutting){ const g=fp*0.22; bx+=(fireX-bx)*g; by+=(fireY-by)*g; }
-        const wph=wt + u.ox*0.018 + u.oy*0.012;                   // 長波長の空間波＝近い節ほど同位相で一緒に揺れる→密着したまま波打つ
-        u._x=bx+Math.sin(wph)*jj; u._y=by+Math.cos(wph*0.9)*jj;
+        u._x=bx+Math.sin(u.ph*3)*jj; u._y=by+Math.cos(u.ph*2.3)*jj;   // ★各節が個別にバズる（ユーザー好み）。加熱時は隙間が開くが許容
         if(u._x<8)u._x=8; else if(u._x>W-56)u._x=W-56;             // 変形で温度計/端へはみ出さないよう表示位置をクランプ
         if(u._y<8)u._y=8; else if(u._y>H-8)u._y=H-8; }
       // ※結合線（ボール&スティックの棒）は廃止＝節を密着オーバーラップさせ“みっちり繋がった塊”で連結を表現
