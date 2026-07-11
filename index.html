@@ -51,10 +51,11 @@
   .meter .sbar i{position:absolute; left:0; top:0; bottom:0; width:0%; border-radius:4px; background:#B6C24A; transition:width .2s linear, background .3s}
   .meter .sbar .tk{position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,.28)}
   .meter .mval{font:700 11px ui-monospace,monospace; color:var(--ink2); min-width:2.6em; text-align:right; font-variant-numeric:tabular-nums}
-  .overlay{position:absolute; inset:0; display:grid; place-items:center; background:rgba(20,14,8,.72); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); z-index:5; text-align:center; padding:24px; overflow:auto}
+  .overlay{position:absolute; inset:0; display:grid; place-items:center; background:rgba(20,14,8,.72); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); z-index:5; text-align:center; padding:14px; overflow:auto}
   .overlay[hidden]{display:none}
-  .overlay h2{margin:0 0 8px; font-size:24px}
-  .overlay p{color:var(--ink2); line-height:1.7; font-size:14px; margin:6px 0 0}
+  .overlay > div{max-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center}
+  .overlay h2{margin:0 0 5px; font-size:21px}
+  .overlay p{color:var(--ink2); line-height:1.5; font-size:13px; margin:4px 0 0}
   .overlay b{color:var(--accent)}
   .btn{margin-top:18px; border:none; cursor:pointer; font-family:inherit; font-weight:800; font-size:17px; color:#241a08;
     background:var(--accent); padding:14px 32px; border-radius:12px; box-shadow:0 5px 0 #9c7a1e; transition:transform .07s}
@@ -78,7 +79,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v127｜v126ベース】チュートリアルをゲート式に：各ステップの指示を達成すると『次へ』が解禁（未達成はグレーで押せない）。firingは②から解禁＝①は加熱だけ＝徐々に操作を覚える。酸敗速度は0.17据置</span>
+    <span class="hint">【v128｜v127ベース】チュートリアル：タイマー停止・失活③/酸敗④まで説明前は起きない（温度クランプ/ロック）。＋タイトル/クリア/GO画面をコンパクト化（文章要約・フォント/余白圧縮・結果画面はグルコース君非表示）＝スクロールバーを出さない</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -94,7 +95,7 @@
     <div id="dbg" style="position:absolute;top:8px;left:10px;z-index:6;pointer-events:none;font:700 12px ui-monospace,Menlo,Consolas,monospace;color:#8fe3c8;text-shadow:0 1px 2px rgba(0,0,0,.6)"></div>
     <div class="overlay" id="ov">
       <div>
-        <svg class="kun" viewBox="0 0 110 110" width="92" height="92" aria-hidden="true">
+        <svg class="kun" viewBox="0 0 110 110" width="66" height="66" aria-hidden="true">
           <defs><radialGradient id="gk" cx="38%" cy="34%" r="66%">
             <stop offset="0" stop-color="#f9dbee"/><stop offset=".55" stop-color="#eab9d5"/><stop offset=".86" stop-color="#cf90c9"/><stop offset="1" stop-color="#a86ba0"/>
           </radialGradient></defs>
@@ -104,11 +105,9 @@
           <path d="M44 60 Q55 72 66 60" fill="none" stroke="#42283f" stroke-width="4.5" stroke-linecap="round"/>
         </svg>
         <h2>アミラーＺ</h2>
-        <p><b>①</b> 画面を<b>ゆびでゴシゴシ</b>こする＝温まる（<b>速く往復</b>するほど熱い）<br>
-        <b>②</b> 右の温度計が<b>適温の帯</b>で擦ると<b>でんぷんが糖に</b>。<b>全部こわせばクリア！</b><br>
-        <b>③</b> 熱くしすぎると<b>酵素が失活</b>（3つで終了）。<b>アツくなったら手を止めて冷ませ。</b><br>
-        <b>④</b> でも<b>冷やしすぎもNG</b>。<b>54℃を下回ると酸敗ゲージ</b>（上）がジワジワ上昇＝<b>戻らない</b>。<b>満タンでゲームオーバー</b>。</p>
-        <p style="font-size:12px">※片道スワイプでは温まらない／適温はゆらゆら動くので追いかけて</p>
+        <p>ゆびで<b>ゴシゴシ往復</b>して温め、<b>適温の帯(緑57〜64℃)</b>で擦るとでんぷんが<b>糖に</b>。全部分解で<b>クリア！</b><br>
+        <b>熱すぎ＝失活</b>／<b>冷やしすぎ＝酸敗</b>に注意。<br>
+        <span style="font-size:11.5px; color:var(--ink3)">くわしい遊び方は「あそびかた」で体験！</span></p>
         <div class="btnrow"><button class="btn" id="start">はじめる</button><button class="btn ghost" id="tut">あそびかた</button></div>
       </div>
     </div>
@@ -477,18 +476,18 @@
   function winFanfare(){ if(muted)return; [523,659,784,1047,1319].forEach((f,i)=> setTimeout(()=>beep(f,.28,"triangle",.07), i*120)); }
   function sugarBreakdownHTML(){   // クリア/GO画面の“作った糖”一覧＝糖名＋一般名＋一言説明つき（知育・少し大きめ）
     const rows=SUGARS.map(s=>{ const n=sugarStock[s.key]||0;
-      return '<div style="margin:7px 0;'+(n>0?'':'opacity:.4;')+'">'
-        +'<b style="color:'+s.col+';font-size:15px">'+s.name+'</b>'
-        +(s.jname?'<span style="color:var(--ink2);font-size:11.5px">（'+s.jname+'）</span>':'')
-        +' <b style="font-size:17px;color:var(--ink)">×'+n+'</b>'
-        +'<div style="font-size:11px;color:var(--ink2);line-height:1.45">'+s.desc+'</div></div>';
+      return '<div style="margin:3px 0;'+(n>0?'':'opacity:.4;')+'">'
+        +'<b style="color:'+s.col+';font-size:13px">'+s.name+'</b>'
+        +(s.jname?'<span style="color:var(--ink2);font-size:11px">（'+s.jname+'）</span>':'')
+        +' <b style="font-size:15px;color:var(--ink)">×'+n+'</b>'
+        +'<div style="font-size:10.5px;color:var(--ink2);line-height:1.3">'+s.desc+'</div></div>';
     }).join('');
-    return '<div style="text-align:left;display:inline-block;max-width:300px"><span style="font-size:12px;color:var(--ink2)">作った糖</span>'+rows+'</div>';
+    return '<div style="text-align:left;display:inline-block;max-width:300px"><span style="font-size:11px;color:var(--ink2)">作った糖</span>'+rows+'</div>';
   }
   function showWinOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
-    ov.querySelector("h2").textContent="ゲームクリア！";
-    const timeLine='<span style="font-size:30px">クリアタイム <b style="color:#EAF6D8">'+fmtTime(elapsed)+'</b></span>'+(winIsBest?' <b style="color:#EAD24E">新記録！</b>':(bestTime!=null?'<br><span style="font-size:12px">ベスト '+fmtTime(bestTime)+'</span>':''));
-    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine+'<br><br>'+sugarBreakdownHTML();
+    ov.querySelector("h2").textContent="ゲームクリア！"; const kn=ov.querySelector(".kun"); if(kn) kn.style.display="none";   // 結果画面は高さ節約のためグルコース君を隠す
+    const timeLine='<span style="font-size:23px">クリアタイム <b style="color:#EAF6D8">'+fmtTime(elapsed)+'</b></span>'+(winIsBest?' <b style="color:#EAD24E">新記録！</b>':(bestTime!=null?'<br><span style="font-size:12px">ベスト '+fmtTime(bestTime)+'</span>':''));
+    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine+'<br>'+sugarBreakdownHTML();
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
     document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
   function denature(){ if(tutMode) tutDenat++;                     // チュートリアル：失活を体験した回数（③のgoal判定）
@@ -514,7 +513,7 @@
     setTimeout(showOverOverlay, 900); }
   function showOverOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
     const sr=overReason==="sour";
-    ov.querySelector("h2").textContent= sr?"酸敗…":"ゲームオーバー";
+    ov.querySelector("h2").textContent= sr?"酸敗…":"ゲームオーバー"; const kn=ov.querySelector(".kun"); if(kn) kn.style.display="none";   // 結果画面は高さ節約
     const frac=totalStarch?Math.round((1-starch.length/totalStarch)*100):0;
     const lead= sr?"低温が続いて酸敗してしまった…":"酵素がすべて失活してしまった…";
     const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=lead+"<br>分解 <b>"+frac+"%</b><br><br>"+sugarBreakdownHTML();
@@ -567,7 +566,7 @@
         runStart=now;                                           // 待機中はタイマー原点を今に固定＝経過0のまま
         if(spd>2) moveStarted=true;                             // 初回スクラブで始動
       }
-      elapsed=(now-runStart)/1000;                            // タイムアタックの経過時間
+      if(tutMode){ runStart=now; elapsed=0; } else elapsed=(now-runStart)/1000;   // ★チュートリアル中はタイマーを動かさない（練習なので）
       if(spd>2) idleT=0; else idleT+=dt;                       // 手を離している時間（長いほど下降が加速）
       if(moveStarted){                                          // 適温バンドの漂い/突発ダッシュは始動後だけ動かす
         // 適温バンドの中心zCをゆっくり漂わせる（モメンタム付きランダムウォーク／両端で反射）＝擦りの単純化を防ぐ揺らぎ
@@ -614,7 +613,7 @@
         }
         aimT=temp+heatE;
         if(denLock>0){ denLock-=rdt; temp=_t0; aimT=temp; }     // 失活の硬直中は温度を固定（押し戻した55℃のまま＝硬直中の冷却で酸敗域に落ちない）
-        else if(temp>DENATURE){ denature(); }                   // 崖：73℃で失活
+        else if(temp>DENATURE){ if(!tutMode || tutStep>=2) denature(); else temp=DENATURE-1; }   // 崖：73℃で失活。★チュートリアルは③(index2)まで失活させない＝説明前は温度を崖直下に留める
         else if(starch.length && inZone && growT>=1 && (!tutMode || tutStep>=1)){   // 崖手前まで、擦った“仕事量”が溜まると発火。★チュートリアルは②(index1)以降で解禁＝①は加熱だけ練習
           charge += spd*(activeTouch?TOUCH_CHARGE_MUL:1); if(charge>=SHRED_WORK){ charge=0; startFiring(); }
         } else { charge=Math.max(0, charge-rdt*40); }           // ゾーン外/塊なしでは仕事は少しずつ抜ける
@@ -631,7 +630,7 @@
       else dangerBeatT=0;
       // 酸敗リスク：50℃(SOUR_T)を下回ると酸敗ゲージが増える（低温ほど速い）／50℃以上で回復。満タンでゲームオーバー
       if(temp>=GREEN[0]) sourArmed=true;                          // 一度でも発火ゾーンに到達したら作動（開始の登坂は猶予）
-      if(sourArmed && !firing && temp<SOUR_T){                    // 54℃未満で酸度がジワジワ上がる（不可逆＝戻らない）。低温ほど速い
+      if(sourArmed && !firing && temp<SOUR_T && (!tutMode || tutStep>=3)){   // 54℃未満で酸度がジワジワ上がる。★チュートリアルは④(index3)まで酸敗させない＝説明前は溜まらない
         const cold=1+(SOUR_T-temp)/(SOUR_T-START_T)*(SOUR_COLD-1);
         const before=sour; sour=Math.min(1, sour+SOUR_RATE*cold*dt);
         if(Math.floor(sour*3)>Math.floor(before*3)) beep(300+Math.floor(sour*3)*90,0.07,"square",.04);  // 1/3ラインを越えるたび短い警告音＝“酸度が上がった”手応え
@@ -737,7 +736,7 @@
       v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,`rgba(170,80,50,${(.1+dz*.45).toFixed(2)})`);
       ctx.fillStyle=v; ctx.fillRect(0,0,W,H); }
     // 酸敗の予感(54℃未満)：画面ふちがくすんだ黄緑に沈む＝酸度が上がっていく。ゲージが溜まるほど濃く＋脈動
-    if(sourArmed && temp<SOUR_T && !firing){
+    if(sourArmed && temp<SOUR_T && !firing && (!tutMode || tutStep>=3)){   // 酸敗ビネット/「酸敗中」表示も④まで出さない
       const pulse=0.6+0.4*Math.sin(performance.now()/100);
       const v=ctx.createRadialGradient(cx(),cy(),Math.min(W,H)*0.18,cx(),cy(),Math.max(W,H)*0.62);
       v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,`rgba(150,165,60,${(.1+sour*.32+pulse*.08).toFixed(2)})`);
