@@ -74,12 +74,16 @@
     background:var(--accent); padding:9px 15px; border-radius:10px; box-shadow:0 3px 0 #9c7a1e}
   .coachbtn:active{transform:translateY(2px); box-shadow:0 1px 0 #9c7a1e}
   .coachbtn.off{opacity:.4; pointer-events:none; box-shadow:none; background:#6b5a3a}
+  .tutarrow{position:fixed; z-index:9; transform:translateX(-50%); font-size:26px; pointer-events:none;
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.6)); animation:tutbob .7s ease-in-out infinite}
+  .tutarrow[hidden]{display:none}
+  @keyframes tutbob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-6px)}}
   @media (max-width:560px){ header{display:none} .overlay h2{font-size:22px} .overlay p{font-size:13.5px} }
 </style>
 
 <div class="wrap">
   <header>
-    <span class="hint">【v131｜v130ベース】ホーム画面アイコンのキャッシュ対策：icon.png→icon-v2.pngにリネーム（同一URLだと古いZアイコンがキャッシュされ更新されないため）。中身は3体クラスタ
+    <span class="hint">【v132｜v131ベース】あそびかた拡充（全てtutMode内）：糖4種を帯固定で1つずつ切らせ発火で止めて「切れた数＋説明」カード表示（高分子ほど沢山）／失活で酵素を1つ減らし👆矢印／酸敗はゲージへ👆矢印＋満タンまで上がるのを見せる
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -114,6 +118,7 @@
     <div class="coach" id="coach" hidden><span id="coachtxt"></span><button class="coachbtn" id="coachnext">次へ</button></div>
   </div>
 </div>
+<div class="tutarrow" id="tutArrow" hidden>👆</div>
 
 <script>
 (function(){
@@ -177,7 +182,7 @@
   let runStart=0, elapsed=0, bestTime=null, winIsBest=false, dashT=3, dashHold=0, dashDir=0;
   let sour=0, sourArmed=false, overReason="enzyme";               // 酸敗ゲージ(0..1・不可逆)／作動フラグ(57℃到達で真)／敗因
   let sourSndT=0;                                                 // 酸敗中サウンドの再生間隔タイマー
-  let tutMode=false, tutStep=0, tutGoalMet=false, tutFires=0, tutDenat=0, tutPaused=false;   // 操作説明チュートリアル。tutPaused=達成した瞬間にゲームを止めて「できた！」を見せる（次へで再開）
+  let tutMode=false, tutStep=0, tutGoalMet=false, tutFires=0, tutDenat=0, tutPaused=false, tutLast="";   // 操作説明チュートリアル（すべてtutModeガード＝本番に影響なし）。tutPaused=達成の瞬間ポーズ／tutLast=最後に切った糖key（糖ごとデモのgoal判定）
   try{ const b=localStorage.getItem('kojiShredBest'); if(b) bestTime=parseFloat(b); }catch(e){}
   (function(){ const d=document.getElementById("dbg"); if(d) d.style.display="none"; })();   // デバッグ表示は隠す（スコアHUDを出すため）
   function fmtTime(s){ s=Math.max(0,s); const m=Math.floor(s/60), sec=s-m*60; return m+":"+(sec<10?"0":"")+sec.toFixed(1); }
@@ -336,30 +341,47 @@
   // ---- 操作説明チュートリアル（プレイ画面上でコーチ吹き出し／失活・酸敗しても続行＝安全に練習）----
   // 段階的チュートリアル：各ステップは「指示text」と「達成条件goal」を持つ。goalを満たすと『次へ』が解禁＝内容に沿って順番に体験。firing(糖に切る)はstep②から解禁＝徐々に操作解除
   const TUT=[
-    { text:"① まず指で画面を<b>ゴシゴシ往復</b>してこすってみよう🔥 右の温度計を<b>50℃くらい</b>まで上げてみて（速いほど熱い／片道はダメ）",
+    { text:"① まず指で画面を<b>ゴシゴシ往復</b>してこすってみよう🔥 右の温度計を<b>50℃くらい</b>まで（速いほど熱い／片道はダメ）",
       goal:()=>temp>=50 },
-    { text:"② いいね！次は<b>緑の“適温バンド”(約57〜64℃)</b>で擦ってみよう。でんぷんが<b>糖に切れる</b>よ。帯はゆらゆら動くので追いかけて！<b>1回切ってみよう</b>",
-      goal:()=>tutFires>=1 },
-    { text:"③ 今度は<b>わざと熱くしすぎ</b>てみよう。<b>73℃(崖)</b>を超えると酵素が<b>失活（アチチ！）</b>＝本番は酵素を1つ失う（練習だから平気）",
-      goal:()=>tutDenat>=1 },
-    { text:"④ 逆に<b>手を止めて冷やしすぎ</b>てみよう。<b>54℃を下回る</b>と<b>「酸敗中」</b>に…上のゲージが溜まるよ（本番は戻らない）",
-      goal:()=>sour>=0.06 },
+    // 糖の種類デモ：帯を各糖に固定して切らせ、発火の瞬間ポーズで「切れた数＋説明」を見せる（高分子ほど沢山＝速い）
+    { text:"② 温度計の<b>緑の適温バンド</b>で擦るとでんぷんが糖に。バンドが<b>低温側</b>のとき＝<b>グルコース</b>。擦って<b>切ってみよう！</b>",
+      lockZC:59, goal:()=>tutLast==='glu', card:()=>sugarCardHTML('glu') },
+    { text:"③ バンドが少し上がると<b>マルトース</b>。<b>切ってみよう！</b>（同じ1擦りでも切れる数が変わるよ）",
+      lockZC:62.5, goal:()=>tutLast==='mal', card:()=>sugarCardHTML('mal') },
+    { text:"④ さらに上がると<b>マルトトリオース</b>。<b>切ってみよう！</b>",
+      lockZC:65.2, goal:()=>tutLast==='mt3', card:()=>sugarCardHTML('mt3') },
+    { text:"⑤ 崖の手前は<b>デキストリン</b>。一度に<b>どっさり</b>千切れる！<b>切ってみよう</b>（熱くしすぎ注意）",
+      lockZC:69, goal:()=>tutLast==='dex', card:()=>sugarCardHTML('dex') },
+    { text:"⑥ 今度は<b>わざと73℃(崖)を超えて</b>みよう。酵素が<b>失活</b>して👆<b>1つ減る</b>（本番は3つ無くなるとゲームオーバー）",
+      arrowEl:'life', goal:()=>tutDenat>=1 },
+    { text:"⑦ 逆に<b>手を止めて54℃以下に冷やす</b>と<b>酸敗</b>。👆酸敗ゲージ(上)が<b>どんどん上がる</b>！<b>満タンでアウト</b>（本番は戻らない）。上がるのを見て！",
+      arrowEl:'sour', goal:()=>sour>=0.6 },
     { text:"これで全部マスター！🎉 ボタンで<b>本番スタート</b>", goal:null },
   ];
+  function sugarCardHTML(key){ const s=SUGARS.find(x=>x.key===key), n=s.dp*MOL_PER_FIRE;   // 発火で止めて出す糖カード（切れた数＝dp×4＋一言説明）
+    return '<b style="color:'+s.col+'">✅ '+s.name+'</b>'+(s.jname?'<span style="font-size:11px;color:var(--ink2)">（'+s.jname+'）</span>':'')
+      +' ＝1擦りで <b style="font-size:16px;color:var(--ink)">'+n+'個</b> 千切れた！'
+      +'<div style="font-size:11px;color:var(--ink2);line-height:1.4;margin-top:2px">'+s.desc+' <b style="color:var(--accent)">高分子ほど沢山千切れて速い。</b></div>'; }
+  function updateArrow(){ const a=document.getElementById("tutArrow"); if(!a)return;   // 失活=酵素/酸敗=ゲージ を👆矢印で指す（対象DOMの真下に配置）
+    const key=(tutMode&&TUT[tutStep])?TUT[tutStep].arrowEl:null;
+    if(!key){ a.hidden=true; return; }
+    const el = key==='life' ? document.querySelector(".tb-life") : document.querySelectorAll(".meter")[1];
+    if(!el){ a.hidden=true; return; }
+    const r=el.getBoundingClientRect(); a.style.left=(r.left+r.width/2)+"px"; a.style.top=(r.bottom+2)+"px"; a.hidden=false; }
   function showCoach(){ const c=document.getElementById("coach"); if(!c)return;
     const st=TUT[tutStep], last=(tutStep>=TUT.length-1), ready=(last||!st.goal||tutGoalMet);
-    document.getElementById("coachtxt").innerHTML=((ready&&!last)?"✅ <b>できた！</b> ":"")+st.text;
+    document.getElementById("coachtxt").innerHTML = (ready&&!last&&st.card) ? st.card() : (((ready&&!last)?"✅ <b>できた！</b> ":"")+st.text);   // 達成時：糖ステップは説明カード
     const btn=document.getElementById("coachnext");
     btn.textContent = last ? "本番スタート！" : (ready ? "次へ ▶" : "やってみよう…");
     btn.classList.toggle("off", !ready);                 // 未達成の間は押せない（グレー）＝指示をこなすと解禁
-    c.hidden=false; }
+    c.hidden=false; updateArrow(); }
   function tutGoalReached(){ tutGoalMet=true; tutPaused=true; beep(660,0.09,"triangle",.06); setTimeout(()=>beep(880,0.12,"triangle",.06),90); showCoach(); }  // 達成＝ポーズ＋「できた！」チャイム＋『次へ』解禁（凍結して状態を見せる）
   function tutCheck(){ if(!tutMode||tutGoalMet) return; const g=TUT[tutStep].goal; if(g&&g()) tutGoalReached(); }   // 毎フレーム達成判定
-  function startTutorial(){ tutMode=true; tutStep=0; tutGoalMet=false; tutPaused=false; tutFires=0; tutDenat=0; start(); growT=1; showCoach(); }
+  function startTutorial(){ tutMode=true; tutStep=0; tutGoalMet=false; tutPaused=false; tutFires=0; tutDenat=0; tutLast=""; start(); growT=1; showCoach(); }
   function coachNext(){ const st=TUT[tutStep], last=(tutStep>=TUT.length-1);
     if(!last && st.goal && !tutGoalMet) return;          // 指示をこなすまで進めない
-    tutStep++; tutGoalMet=false; tutPaused=false;         // 次のステップへ＝ポーズ解除して再開
-    if(tutStep>=TUT.length){ document.getElementById("coach").hidden=true; tutMode=false; start(); }   // 本番開始
+    tutStep++; tutGoalMet=false; tutPaused=false; tutLast="";  // 次のステップへ＝ポーズ解除して再開（糖判定もリセット）
+    if(tutStep>=TUT.length){ document.getElementById("coach").hidden=true; const ar=document.getElementById("tutArrow"); if(ar)ar.hidden=true; tutMode=false; start(); }   // 本番開始
     else showCoach(); }
   document.getElementById("tut").addEventListener("click", ()=>{ const a=ac(); if(a&&a.state==="suspended"){ try{ a.resume(); }catch(_){} } startTutorial(); });
   document.getElementById("coachnext").addEventListener("click", coachNext);
@@ -401,6 +423,7 @@
     const e=Math.min(combo,10);
     // === 破壊：指の下のでんぷんを、糖の分子サイズ(dp)ごとの塊で壊す。破壊の中心(fx,fy)に演出を集中 ===
     const sug = pendingSugar || sugarAt(zC), dp = sug?sug.dp:1;       // 今の適温で出来る糖＝分子サイズdp
+    if(tutMode && sug) tutLast=sug.key;                              // チュートリアル：最後に切った糖（糖ごとデモのgoal判定）
     const byId={}; for(const u of starch) byId[u.id]=u;
     const cut = Object.keys(pendingCut).length ? pendingCut : pickCut(dp);
     let fx=0, fy=0, nc=0;
@@ -492,7 +515,7 @@
     document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
   function denature(){ if(tutMode) tutDenat++;                     // チュートリアル：失活を体験した回数（③のgoal判定）
     denLock=0.5; temp=DENATURE_KNOCK; heatE=0; charge=0; combo=0; firing=false; pendingSugar=null; pendingCut={};  // ★温度は55℃まで押し戻す（全リセットはしない）＝少し登り直す程度でゲーム続行。硬直中は温度固定
-    if(!tutMode){ enzymeLife=Math.max(0, enzymeLife-1); refreshLife(); }   // 失活で酵素を1つ失う（チュートリアルでは減らさず＝安全に練習）
+    enzymeLife=Math.max(tutMode?1:0, enzymeLife-1); refreshLife();   // 失活で酵素を1つ失う。★チュートリアルでも1つ減らして見せる（ただし最低1つ残す＝ゲームオーバーしない）
     // 失活の手応え（ライフ喪失）を強調：フラッシュ＋大揺れ＋ヒットストップ＋熱そうな赤橙の破片＆湯気＋衝撃波。温度が落ちなくても“失活した”と即分かるように
     shakeMag=26; flash=.75; hitstop=0.09; fireX=cx(); fireY=cy();
     beep(70,0.34,"sawtooth",.11); setTimeout(()=>beep(48,0.3,"sawtooth",.10),70);
@@ -589,6 +612,7 @@
         zVel=Math.max(-zmv,Math.min(zmv,zVel)); zC+=zVel*dt;
         if(zC<Z_MIN){ zC=Z_MIN; zVel=Math.abs(zVel)*0.5; } if(zC>Z_MAX){ zC=Z_MAX; zVel=-Math.abs(zVel)*0.5; }
       }
+      if(tutMode && TUT[tutStep] && TUT[tutStep].lockZC!=null){ zC=TUT[tutStep].lockZC; zVel=0; }   // ★チュートリアルの糖デモ：適温バンドをその糖の温度に固定＝狙った糖を切れる
       if(firing){ fireT-=dt; if(fireT<=0){ shred(); } }        // 発火の寸止め → ズタッ
       else if(rdt>0){
         const _t0=temp;                                        // 失活の硬直中に温度を固定するための退避
@@ -613,7 +637,7 @@
         }
         aimT=temp+heatE;
         if(denLock>0){ denLock-=rdt; temp=_t0; aimT=temp; }     // 失活の硬直中は温度を固定（押し戻した55℃のまま＝硬直中の冷却で酸敗域に落ちない）
-        else if(temp>DENATURE){ if(!tutMode || tutStep>=2) denature(); else temp=DENATURE-1; }   // 崖：73℃で失活。★チュートリアルは③(index2)まで失活させない＝説明前は温度を崖直下に留める
+        else if(temp>DENATURE){ if(!tutMode || tutStep>=5) denature(); else temp=DENATURE-1; }   // 崖：73℃で失活。★チュートリアルは⑥(index5:失活の説明)まで失活させない＝説明前は温度を崖直下に留める
         else if(starch.length && inZone && growT>=1 && (!tutMode || tutStep>=1)){   // 崖手前まで、擦った“仕事量”が溜まると発火。★チュートリアルは②(index1)以降で解禁＝①は加熱だけ練習
           charge += spd*(activeTouch?TOUCH_CHARGE_MUL:1); if(charge>=SHRED_WORK){ charge=0; startFiring(); }
         } else { charge=Math.max(0, charge-rdt*40); }           // ゾーン外/塊なしでは仕事は少しずつ抜ける
@@ -630,7 +654,7 @@
       else dangerBeatT=0;
       // 酸敗リスク：50℃(SOUR_T)を下回ると酸敗ゲージが増える（低温ほど速い）／50℃以上で回復。満タンでゲームオーバー
       if(temp>=GREEN[0]) sourArmed=true;                          // 一度でも発火ゾーンに到達したら作動（開始の登坂は猶予）
-      if(sourArmed && !firing && temp<SOUR_T && (!tutMode || tutStep>=3)){   // 54℃未満で酸度がジワジワ上がる。★チュートリアルは④(index3)まで酸敗させない＝説明前は溜まらない
+      if(sourArmed && !firing && temp<SOUR_T && (!tutMode || tutStep>=6)){   // 54℃未満で酸度がジワジワ上がる。★チュートリアルは⑦(index6:酸敗の説明)まで酸敗させない＝説明前は溜まらない
         const cold=1+(SOUR_T-temp)/(SOUR_T-START_T)*(SOUR_COLD-1);
         const before=sour; sour=Math.min(1, sour+SOUR_RATE*cold*dt);
         if(Math.floor(sour*3)>Math.floor(before*3)) beep(300+Math.floor(sour*3)*90,0.07,"square",.04);  // 1/3ラインを越えるたび短い警告音＝“酸度が上がった”手応え
@@ -736,7 +760,7 @@
       v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,`rgba(170,80,50,${(.1+dz*.45).toFixed(2)})`);
       ctx.fillStyle=v; ctx.fillRect(0,0,W,H); }
     // 酸敗の予感(54℃未満)：画面ふちがくすんだ黄緑に沈む＝酸度が上がっていく。ゲージが溜まるほど濃く＋脈動
-    if(sourArmed && temp<SOUR_T && !firing && (!tutMode || tutStep>=3)){   // 酸敗ビネット/「酸敗中」表示も④まで出さない
+    if(sourArmed && temp<SOUR_T && !firing && (!tutMode || tutStep>=6)){   // 酸敗ビネット/「酸敗中」表示も⑦まで出さない
       const pulse=0.6+0.4*Math.sin(performance.now()/100);
       const v=ctx.createRadialGradient(cx(),cy(),Math.min(W,H)*0.18,cx(),cy(),Math.max(W,H)*0.62);
       v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,`rgba(150,165,60,${(.1+sour*.32+pulse*.08).toFixed(2)})`);
