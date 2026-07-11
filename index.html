@@ -29,22 +29,21 @@
     background:radial-gradient(circle at 34% 30%, #C4EDA8, #6FBE4A); box-shadow:0 0 6px rgba(127,190,90,.6);
     transition:transform .2s, opacity .25s, background .25s, box-shadow .25s}
   .enz.dead{background:#4a4a44; box-shadow:none; opacity:.35; transform:scale(.8) rotate(12deg)}
-  .foot{display:flex; align-items:center; gap:12px; color:var(--ink2); font-size:12px}
-  .foot .big{font-size:15px; color:var(--ink); font-weight:800; display:inline-block; transform-origin:center bottom; transition:transform .13s cubic-bezier(.2,1.7,.4,1), color .13s}
-  .foot .sp{margin-left:auto}
-  .hud{display:flex; align-items:center; gap:12px}
-  .hud-time{display:flex; align-items:baseline; gap:7px}
-  .hud-time #timer{font:800 22px ui-monospace,Menlo,Consolas,monospace; color:var(--ink); letter-spacing:.01em; font-variant-numeric:tabular-nums}
-  .hud-time #besttime{font:700 11px ui-monospace,monospace; color:var(--accent)}
-  .hud-prog{flex:1; display:flex; align-items:center; gap:8px}
-  .hud-prog .bar{flex:1; height:7px; border-radius:4px; background:rgba(255,255,255,.10); overflow:hidden}
-  .hud-prog .bar i{display:block; height:100%; width:0%; background:var(--green); border-radius:4px; transition:width .18s linear}
-  .hud-prog #progpct{font:700 11px ui-monospace,monospace; color:var(--ink2); min-width:4.8em; text-align:right; font-variant-numeric:tabular-nums}
-  .sourbar{display:flex; align-items:center; gap:8px}
-  .sourbar .lbl{font:800 11px 'Hiragino Kaku Gothic ProN',sans-serif; color:var(--ink2); min-width:2.6em; letter-spacing:.08em}
-  .sbar{position:relative; flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,.08); overflow:hidden}
-  .sbar i{position:absolute; left:0; top:0; bottom:0; width:0%; border-radius:4px; background:#B6C24A; transition:width .2s linear, background .3s}
-  .sbar .tk{position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,.28)}
+  /* 上部＝2段：①酵素・タイム・ミュート ②分解／酸敗の2メーター */
+  .topbar{display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px}
+  .tb-life{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink2); white-space:nowrap}
+  .tb-time{display:flex; align-items:baseline; gap:8px; justify-self:center}
+  .tb-time #timer{font:800 26px ui-monospace,Menlo,Consolas,monospace; color:var(--ink); letter-spacing:.02em; font-variant-numeric:tabular-nums}
+  .tb-time #besttime{font:700 11px ui-monospace,monospace; color:var(--accent)}
+  .tb-mute{justify-self:end; cursor:pointer; font-size:18px; line-height:1}
+  .meters{display:flex; align-items:center; gap:14px}
+  .meter{flex:1; display:flex; align-items:center; gap:7px; min-width:0}
+  .meter .mlbl{font:800 11px 'Hiragino Kaku Gothic ProN',sans-serif; color:var(--ink2); letter-spacing:.06em; white-space:nowrap}
+  .meter .bar,.meter .sbar{position:relative; flex:1; min-width:0; height:8px; border-radius:4px; background:rgba(255,255,255,.09); overflow:hidden}
+  .meter .bar i{display:block; height:100%; width:0%; background:var(--green); border-radius:4px; transition:width .18s linear}
+  .meter .sbar i{position:absolute; left:0; top:0; bottom:0; width:0%; border-radius:4px; background:#B6C24A; transition:width .2s linear, background .3s}
+  .meter .sbar .tk{position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,.28)}
+  .meter .mval{font:700 11px ui-monospace,monospace; color:var(--ink2); min-width:2.6em; text-align:right; font-variant-numeric:tabular-nums}
   .overlay{position:absolute; inset:0; display:grid; place-items:center; background:rgba(20,14,8,.72); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); z-index:5; text-align:center; padding:24px; overflow:auto}
   .overlay[hidden]{display:none}
   .overlay h2{margin:0 0 8px; font-size:24px}
@@ -58,21 +57,16 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v113｜v112ベース】酸敗ゲージも上部DOM(横バー)へ移設＝左端の縦レール撤去。FIELD_L 22→18で分子が左スペースも使用。酸敗は緑→橙→赤・満タン近く脈動・1/3,2/3のtick付き</span>
+    <span class="hint">【v114｜v113ベース】上部を2段に再整理：①酵素・タイム(主役)・ミュート ②分解／酸敗の2メーター。連続・ベスト表記は撤去（combo/bestは演出強度用に内部保持）</span>
   </header>
-  <div class="foot">
-    <span>酵素 <span class="life" id="life"></span></span>
-    <span>連続 <span class="big" id="combo">0</span></span>
-    <span>ベスト <span class="big" id="best">0</span></span>
-    <span class="sp" id="mute">🔊</span>
+  <div class="topbar">
+    <div class="tb-life">酵素 <span class="life" id="life"></span></div>
+    <div class="tb-time"><b id="timer">0:00.0</b><span id="besttime"></span></div>
+    <div class="tb-mute" id="mute">🔊</div>
   </div>
-  <div class="hud">
-    <div class="hud-time"><b id="timer">0:00.0</b><span id="besttime"></span></div>
-    <div class="hud-prog"><div class="bar"><i id="progfill"></i></div><span id="progpct">分解 0%</span></div>
-  </div>
-  <div class="sourbar">
-    <span class="lbl">酸敗</span>
-    <div class="sbar"><i id="sourfill"></i><b class="tk" style="left:33.3%"></b><b class="tk" style="left:66.6%"></b></div>
+  <div class="meters">
+    <div class="meter"><span class="mlbl">分解</span><div class="bar"><i id="progfill"></i></div><span class="mval" id="progpct">0%</span></div>
+    <div class="meter"><span class="mlbl">酸敗</span><div class="sbar"><i id="sourfill"></i><b class="tk" style="left:33.3%"></b><b class="tk" style="left:66.6%"></b></div></div>
   </div>
   <div class="stage" id="stage">
     <canvas id="cv"></canvas>
@@ -289,7 +283,7 @@
     parts=[]; pops=[]; rings=[]; snaps=[]; pendingCut={}; pendingSugar=null; resetSugar(); zC=Z_MID; zVel=0;
     enzymeLife=MAX_LIFE; refreshLife(); runStart=performance.now(); elapsed=0; winIsBest=false;
     dashT=DASH_MIN+Math.random()*(DASH_MAX-DASH_MIN); dashHold=0; dashDir=0; sour=0; sourArmed=false; overReason="enzyme"; moveStarted=false;
-    document.getElementById("combo").textContent=0; document.getElementById("ov").hidden=true;
+    document.getElementById("ov").hidden=true;
     if(introField){ introField=false; } else { spawnField(); } }   // 初回はチュートリアルで見えている分子をそのままプレイ／2回目以降だけ新規生成
 
   function startFiring(){ firing=true; fireT=WINDUP; windupSound();
@@ -304,10 +298,7 @@
     for(let i=0;i<want;i++) o[order[i][1]]=1;
     return o; }
   function shred(){
-    combo++; best=Math.max(best,combo);
-    const cE=document.getElementById("combo"); cE.textContent=combo; document.getElementById("best").textContent=best;
-    cE.style.transform="scale(1.65)"; cE.style.color="#E0B24A";       // フッター数字がビクッと躍動
-    clearTimeout(cE._t); cE._t=setTimeout(()=>{cE.style.transform="scale(1)"; cE.style.color="";},130);
+    combo++; best=Math.max(best,combo);                              // combo/bestは演出強度に使う（表示は撤去）
     const e=Math.min(combo,10);
     // === 破壊：指の下のでんぷんを、糖の分子サイズ(dp)ごとの塊で壊す。破壊の中心(fx,fy)に演出を集中 ===
     const sug = pendingSugar || sugarAt(zC), dp = sug?sug.dp:1;       // 今の適温で出来る糖＝分子サイズdp
@@ -383,7 +374,6 @@
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
     document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
   function denature(){ denLock=0.5; temp=DENATURE_KNOCK; heatE=0; charge=0; combo=0; firing=false; pendingSugar=null; pendingCut={};  // ★温度は55℃まで押し戻す（全リセットはしない）＝少し登り直す程度でゲーム続行。硬直中は温度固定
-    document.getElementById("combo").textContent=0;
     enzymeLife=Math.max(0, enzymeLife-1); refreshLife();          // 失活で酵素を1つ失う
     // 失活の手応え（ライフ喪失）を強調：フラッシュ＋大揺れ＋ヒットストップ＋熱そうな赤橙の破片＆湯気＋衝撃波。温度が落ちなくても“失活した”と即分かるように
     shakeMag=26; flash=.75; hitstop=0.09; fireX=cx(); fireY=cy();
@@ -683,7 +673,7 @@
     const bt=document.getElementById("besttime"); if(bt) bt.textContent = bestTime!=null ? "BEST "+fmtTime(bestTime) : "";
     const frac = totalStarch ? 1-starch.length/totalStarch : 0;
     const pf=document.getElementById("progfill"); if(pf) pf.style.width=(frac*100).toFixed(1)+"%";
-    const pp=document.getElementById("progpct"); if(pp) pp.textContent="分解 "+Math.round(frac*100)+"%";
+    const pp=document.getElementById("progpct"); if(pp) pp.textContent=Math.round(frac*100)+"%";
     // 酸敗ゲージ＝上部DOMの横バー（左端の縦レールから移設）。緑→橙→赤・満タン近くで脈動。1/3・2/3の目安はCSSのtick
     const lv=Math.max(0,Math.min(1,sour)), sHi=lv>0.66, sMid=lv>0.33;
     const sf=document.getElementById("sourfill");
