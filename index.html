@@ -83,7 +83,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v134｜v133ベース】分子に<b>アミロース(直鎖・青)</b>を追加。白米準拠でアミロース2:アミロペクチン8を毎回固定(タイムアタック整合)。アミロースは硬く1擦りで<b>半分しか千切れない</b>(pickCut半減)。あそびかた冒頭にアミロース/アミロペクチンの違いの説明を追加</span>
+    <span class="hint">【v135｜v134ベース】全体量を150→180に増量、アミロース割合を20%→30%(≒7:3)に増加。あそびかたの各糖カードに「青いアミロースは切れる数が半分」の注記を追加。冒頭説明も7:3に更新</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -142,8 +142,8 @@
     {key:"dex", name:"デキストリン",     jname:"",         desc:"ブドウ糖が多数連なった多糖。とろみのもと。",     lo:66.5, hi:73,   col:"#E4883C", dp:5},
   ];
   const MOL_PER_FIRE=4;                           // 1発火で作る“分子の数”。ちぎれる玉数＝dp×これ（分子が大きいほど沢山ちぎれる）
-  const GLUCOSE_N=150;                            // ★でんぷんのグルコース節数＝毎回固定（タイムアタックの削る量を一定に）。枝ぶり・うねりだけ毎回ランダム。将来200も検討
-  const AMYLOSE_FRAC=0.20;                         // ★白米準拠：アミロース2:アミロペクチン8。組成も毎回固定（引きでタイムが変わらないよう＝タイムアタック整合）。アミロース＝直鎖で硬く、1擦りで半分しか千切れない（pickCutで半減）
+  const GLUCOSE_N=180;                            // ★でんぷんのグルコース節数＝毎回固定（タイムアタックの削る量を一定に）。枝ぶり・うねりだけ毎回ランダム。v134で150→180に増量
+  const AMYLOSE_FRAC=0.30;                         // ★アミロース3:アミロペクチン7（≒高アミロース米）。組成も毎回固定（引きでタイムが変わらないよう＝タイムアタック整合）。アミロース＝直鎖で硬く、1擦りで半分しか千切れない（pickCutで半減）。v134で0.20→0.30に増加
   const CIRC=['','①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
   const MAX_LIFE=3;                               // 酵素ライフ。崖(失活)ごとに1つ失い、ゼロでゲームオーバー
   function sugarAt(t){ for(const s of SUGARS) if(t>=s.lo && t<s.hi) return s; return SUGARS[t>=70?3:0]; }
@@ -361,7 +361,7 @@
   // ---- 操作説明チュートリアル（プレイ画面上でコーチ吹き出し／失活・酸敗しても続行＝安全に練習）----
   // 段階的チュートリアル：各ステップは「指示text」と「達成条件goal」を持つ。goalを満たすと『次へ』が解禁＝内容に沿って順番に体験。firing(糖に切る)はstep②から解禁＝徐々に操作解除
   const TUT=[
-    { text:"👀 これが<b>デンプン</b>！<b>毎回ランダムに生成</b>されるよ。デンプンは<b>グルコース(糖)の集合体</b>で、枝分かれした<b>アミロペクチン</b>(切れやすい)と、<b style='color:#8FB4E8'>青い直鎖のアミロース</b>(硬くて半分しか切れない)でできてる🔬 白米はだいたい<b>8:2</b>。これを酵素で切って糖にしていくよ",
+    { text:"👀 これが<b>デンプン</b>！<b>毎回ランダムに生成</b>されるよ。デンプンは<b>グルコース(糖)の集合体</b>で、枝分かれした<b>アミロペクチン</b>(切れやすい)と、<b style='color:#8FB4E8'>青い直鎖のアミロース</b>(硬くて半分しか切れない)でできてる🔬 お米はだいたい<b>7:3</b>くらい。これを酵素で切って糖にしていくよ",
       goal:null },
     { text:"① まず指で画面を<b>ゴシゴシ往復</b>してこすってみよう🔥 右の温度計を<b>50℃くらい</b>まで（速いほど熱い／片道はダメ）",
       goal:()=>temp>=50 },
@@ -380,10 +380,11 @@
       arrowEl:'sour', goal:()=>sour>=0.6 },
     { text:"これで全部マスター！🎉 本番は<b>全部分解するまでのタイム</b>を競う<b>タイムアタック</b>⏱ <b>高分子を狙うほど一度に沢山切れて速い</b>！自己ベストを目指そう！ ボタンで<b>本番スタート</b>", goal:null },
   ];
-  function sugarCardHTML(key){ const s=SUGARS.find(x=>x.key===key), n=s.dp*MOL_PER_FIRE;   // 発火で止めて出す糖カード（切れた数＝dp×4＋一言説明）
+  function sugarCardHTML(key){ const s=SUGARS.find(x=>x.key===key), n=s.dp*MOL_PER_FIRE, nh=Math.ceil(n/2);   // 発火で止めて出す糖カード（切れた数＝dp×4＋一言説明＋アミロースは半分の注記）
     return '<b style="color:'+s.col+'">✅ '+s.name+'</b>'+(s.jname?'<span style="font-size:11px;color:var(--ink2)">（'+s.jname+'）</span>':'')
       +' ＝1擦りで <b style="font-size:16px;color:var(--ink)">'+n+'個</b> 千切れた！'
-      +'<div style="font-size:11px;color:var(--ink2);line-height:1.4;margin-top:2px">'+s.desc+' <b style="color:var(--accent)">高分子ほど沢山千切れて速い。</b></div>'; }
+      +'<div style="font-size:11px;color:var(--ink2);line-height:1.4;margin-top:2px">'+s.desc+' <b style="color:var(--accent)">高分子ほど沢山千切れて速い。</b>'
+      +'<br><b style="color:#8FB4E8">青いアミロース</b>は硬いので、切れる数は<b style="color:#8FB4E8">半分の'+nh+'個</b>だけ。</div>'; }
   function updateArrow(){ const a=document.getElementById("tutArrow"); if(!a)return;   // 失活=酵素/酸敗=ゲージ を👆矢印で指す（対象DOMの真下に配置）
     const key=(tutMode&&TUT[tutStep])?TUT[tutStep].arrowEl:null;
     if(!key){ a.hidden=true; return; }
