@@ -57,7 +57,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v114｜v113ベース】上部を2段に再整理：①酵素・タイム(主役)・ミュート ②分解／酸敗の2メーター。連続・ベスト表記は撤去（combo/bestは演出強度用に内部保持）</span>
+    <span class="hint">【v115｜v114ベース】分子オブジェクトを見やすく：節を拡大(s=L*0.5＝隣接)＋ドーム陰影コントラスト強化＋目/口を大きく。結合線は玉の下(ボール&スティック)に移し顔を横切らないよう変更</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -168,7 +168,7 @@
     const ry=Math.min((H-FIELD_T-FIELD_B)/2 - 10, rx*1.85);       // ★縦の帯を使う（真円キャップを撤廃）＝上下エリアも生成に使う。プレイ枠が広がった分やや縦長（1.85:1上限）
     const N=GLUCOSE_N;
     const L=Math.sqrt(Math.PI*rx*ry/(N*2.0)); latticeD=L;         // 結合長：節数Nでこの縦長楕円を程よく埋める間隔（密度感K=2.0＝サンプルと同等）＝縦にも広がる
-    const s=L*0.42;                                                // 節(六角)の半径＝結合長より小さく＝隙間に結合線が見える模式図
+    const s=L*0.50;                                                // 節(六角)の半径＝結合長のほぼ半分＝隣とほぼ接する大きめの玉（見やすさ優先）。結合線は玉の下に描くので顔を横切らない
     const minD2=(L*0.82)*(L*0.82);
     const inside=(x,y)=> (x*x)/(rx*rx)+(y*y)/(ry*ry) <= 1;         // 楕円フィールドの内側だけに置く
     const collide=(x,y)=>{ for(const u of starch){ const dx=u.ox-x, dy=u.oy-y; if(dx*dx+dy*dy<minD2) return true; } return false; };  // 自己回避＝読める樹形
@@ -414,12 +414,13 @@
     const c=document.createElement("canvas"); c.width=size; c.height=size;
     const g=c.getContext("2d"); g.setTransform(DPR,0,0,DPR,0,0); g.translate(R,R);
     g.beginPath(); for(let i=0;i<6;i++){ const a=-Math.PI/2+i*Math.PI/3; g.lineTo(Math.cos(a)*s, Math.sin(a)*s*1.02); } g.closePath();
-    const gr=g.createRadialGradient(-s*.2,-s*.3,0,0,0,s);
-    gr.addColorStop(0,toneStop(244,207,233,u.tone,u.lum)); gr.addColorStop(.65,toneStop(224,169,209,u.tone,u.lum)); gr.addColorStop(1,toneStop(192,131,182,u.tone,u.lum));
+    const gr=g.createRadialGradient(-s*.24,-s*.32,0,0,0,s*1.04);       // ドーム状の立体＝明るい頂点→暗いリム（コントラスト強め＝小さくても膨らんで見える）
+    gr.addColorStop(0,toneStop(252,226,244,u.tone,u.lum)); gr.addColorStop(.5,toneStop(234,184,216,u.tone,u.lum));
+    gr.addColorStop(.85,toneStop(204,142,190,u.tone,u.lum)); gr.addColorStop(1,toneStop(168,104,156,u.tone,u.lum));
     g.fillStyle=gr; g.fill();
     const shade=(1-u.depth)*0.52; if(shade>0){ g.fillStyle="rgba(24,12,30,"+shade.toFixed(2)+")"; g.fill(); }
-    g.lineWidth=2; g.strokeStyle="#8f5f88"; g.stroke();               // 熱い時の赤輪郭は本編のtintオレンジで代替
-    g.fillStyle="#4a2f47"; const ex=s*.34, ey=s*.05, er=s*.12;         // 目（常に同じ）
+    g.lineWidth=2.2; g.strokeStyle="#7c5175"; g.stroke();              // くっきりした輪郭（熱い時の赤輪郭は本編tintで代替）
+    g.fillStyle="#42283f"; const ex=s*.32, ey=s*.03, er=s*.16;         // 目を大きく＝小さくても顔が明瞭
     g.beginPath(); g.arc(-ex,-ey,er,0,7); g.arc(ex,-ey,er,0,7); g.fill();
     u.spr=c; u.sprR=R; }
   function drawUnit(x,y,s,rot,face,scared,tint,shade,tone,lum,grad){ tint=tint||0; shade=shade||0; tone=tone||0; lum=lum||0;
@@ -566,7 +567,15 @@
         const cutting=firing&&pendingCut[u.id], jj=jit*(cutting?3.2:1);
         if(cutting){ const g=fp*0.22; bx+=(fireX-bx)*g; by+=(fireY-by)*g; }
         u._x=bx+Math.sin(u.ph*3)*jj; u._y=by+Math.cos(u.ph*2.3)*jj; }
-      // ②玉本体を先に描く（＝結合線を“上”に重ねられるように）。縁(奥/暗)→中心(手前/明)の重なりでドーム状の立体
+      // ★でんぷん鎖の結合＝“玉の下”に描く（ボール＆スティック）＝玉を大きくしても線が顔を横切らない。枝分かれの隙間に覗く。見え方rvb(早め)・張り=heatT
+      { const rvb=Math.max(0,Math.min(1,(temp-36)/(54-36))), h=heatT;
+        const cr=(214+41*h*0.9)|0, cg=(178-58*h*0.9)|0, cb=(206-136*h*0.9)|0;
+        ctx.lineCap="round"; ctx.strokeStyle=`rgba(${cr},${cg},${cb},${(0.34+rvb*0.42).toFixed(2)})`; ctx.lineWidth=Math.max(1.4, latticeD*0.14);
+        ctx.beginPath();
+        for(const bd of bonds){ if(firing&&(pendingCut[bd.a]||pendingCut[bd.b])) continue;
+          const a=byId[bd.a], b=byId[bd.b]; if(!a||!b) continue; ctx.moveTo(a._x,a._y); ctx.lineTo(b._x,b._y); }
+        ctx.stroke(); }
+      // ②玉本体を結合線の上に描く。縁(奥/暗)→中心(手前/明)の重なりでドーム状の立体
       const drawOrder=starch.slice().sort((a,b)=>a.depth-b.depth);
       const shrink=1-fp*0.18;                                        // 発火寸止めで全体が少し縮む
       // ②-a 本体スプライトをdrawImageで貼る（焼き済み＝グラデ塗り/陰/輪郭/目を再計算しない）。発火の縮みと微小回転だけ本編で
@@ -579,23 +588,13 @@
           for(let i=0;i<6;i++){ const a=-Math.PI/2+i*Math.PI/3, px=x+Math.cos(a)*s, py=y+Math.sin(a)*s*1.02; i?ctx.lineTo(px,py):ctx.moveTo(px,py); } ctx.closePath(); }
         ctx.fillStyle="rgba(255,120,45,"+(tint*0.6).toFixed(2)+")"; ctx.fill(); }
       // ②-c 口：状態(scared/face)で変わるので毎フレーム。全玉を1パスにまとめて一括stroke（微小回転は無視）
-      ctx.strokeStyle="#4a2f47"; ctx.lineWidth=2; ctx.lineCap="round"; ctx.beginPath();
+      ctx.strokeStyle="#42283f"; ctx.lineWidth=2.4; ctx.lineCap="round"; ctx.beginPath();
       for(const u of drawOrder){ const s=u.s*shrink, x=u._x, y=u._y;
         if(scared){ ctx.moveTo(x-s*.16, y+s*.34); ctx.arc(x, y+s*.34, s*.16, Math.PI, 0, true); }
         else if(u.face===1){ ctx.moveTo(x+Math.cos(.1)*s*.14, y+s*.2+Math.sin(.1)*s*.14); ctx.arc(x, y+s*.2, s*.14, .1, Math.PI-.1); }
         else { ctx.moveTo(x-s*.16, y+s*.3); ctx.lineTo(x+s*.16, y+s*.3); } }
       ctx.stroke();
-      // ③でんぷん鎖の結合＝細い線を“玉の上＝格子の継ぎ目”に重ねる（ぴっちりでも隠れない）。加熱の早い段階から現れ、熱いほど濃い暖色に張り詰めて細く。切る線は赤バツ
-      const rv=Math.max(0,Math.min(1,(temp-36)/(54-36)));           // 見え始めを早めるランプ（36℃で0→54℃で全開＝発火よりかなり前に構造が見える）
-      ctx.lineCap="round";
-      // 通常の結合は全部同じスタイル→1本のパスにまとめて一括stroke（結合数ぶんのstroke呼び出しを1回に＝大幅軽量化）
-      { const h=heatT, cr=(214+41*h*0.9)|0, cg=(178-58*h*0.9)|0, cb=(206-136*h*0.9)|0;   // 色・太さの張り=heatT（崖に近いほど暖色・細く）／見え方=rv(早め)
-        ctx.strokeStyle=`rgba(${cr},${cg},${cb},${(0.1+rv*0.68).toFixed(2)})`; ctx.lineWidth=Math.max(0.7, 1.6-h*0.8);
-        ctx.beginPath();
-        for(const bd of bonds){ if(firing&&(pendingCut[bd.a]||pendingCut[bd.b])) continue;   // 切る線は下で個別に
-          const a=byId[bd.a], b=byId[bd.b]; if(!a||!b) continue; ctx.moveTo(a._x,a._y); ctx.lineTo(b._x,b._y); }
-        ctx.stroke(); }
-      // 切る線（発火中のみ・少数）＝赤い線＋切断点の赤バツ予告を個別描画
+      // 切る線（発火中のみ・少数）＝赤い線＋切断点の赤バツ予告を個別描画（これは予告なので玉の上に描く）
       if(firing){ for(const bd of bonds){ if(!(pendingCut[bd.a]||pendingCut[bd.b])) continue;
         const a=byId[bd.a], b=byId[bd.b]; if(!a||!b) continue;
         ctx.strokeStyle=`rgba(228,85,58,${(0.6+fp*0.4).toFixed(2)})`; ctx.lineWidth=2.2+fp*2.2;
