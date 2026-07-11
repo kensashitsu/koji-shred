@@ -60,7 +60,8 @@
   .btn{margin-top:18px; border:none; cursor:pointer; font-family:inherit; font-weight:800; font-size:17px; color:#241a08;
     background:var(--accent); padding:14px 32px; border-radius:12px; box-shadow:0 5px 0 #9c7a1e; transition:transform .07s}
   .btn:active{transform:translateY(3px); box-shadow:0 2px 0 #9c7a1e}
-  .overlay .kun{display:block; margin:0 auto 4px; filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
+  .titlelogo{display:block; width:min(86%,330px); margin:2px auto 8px; filter:drop-shadow(0 3px 9px rgba(0,0,0,.5))}
+  .overlay h2:empty{display:none}   /* タイトル画面はロゴ画像が見出し＝空のh2は畳む（win/overでtextを入れると表示）*/
   .btnrow{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
   .btnrow .btn{margin-top:0}
   .btn.ghost{background:transparent; color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset; padding:14px 22px}
@@ -79,7 +80,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v128｜v127ベース】チュートリアル：タイマー停止・失活③/酸敗④まで説明前は起きない（温度クランプ/ロック）。＋タイトル/クリア/GO画面をコンパクト化（文章要約・フォント/余白圧縮・結果画面はグルコース君非表示）＝スクロールバーを出さない</span>
+    <span class="hint">【v129｜v128ベース】チュートリアル：達成した瞬間にポーズ（次へで再開）＝酸敗の上がる感覚も掴める。タイトルロゴを「アミラーＺ全部をグルコース君の模式図」画像に／ホームアイコンも「Ｚ」を模式図に刷新</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -95,16 +96,8 @@
     <div id="dbg" style="position:absolute;top:8px;left:10px;z-index:6;pointer-events:none;font:700 12px ui-monospace,Menlo,Consolas,monospace;color:#8fe3c8;text-shadow:0 1px 2px rgba(0,0,0,.6)"></div>
     <div class="overlay" id="ov">
       <div>
-        <svg class="kun" viewBox="0 0 110 110" width="66" height="66" aria-hidden="true">
-          <defs><radialGradient id="gk" cx="38%" cy="34%" r="66%">
-            <stop offset="0" stop-color="#f9dbee"/><stop offset=".55" stop-color="#eab9d5"/><stop offset=".86" stop-color="#cf90c9"/><stop offset="1" stop-color="#a86ba0"/>
-          </radialGradient></defs>
-          <polygon points="55,9.2 91.4,30.6 91.4,73.4 55,94.8 18.6,73.4 18.6,30.6" fill="url(#gk)" stroke="rgba(120,78,112,.6)" stroke-width="3" stroke-linejoin="round"/>
-          <ellipse cx="34" cy="62" rx="8" ry="6.5" fill="rgba(233,120,150,.35)"/><ellipse cx="76" cy="62" rx="8" ry="6.5" fill="rgba(233,120,150,.35)"/>
-          <circle cx="42" cy="50" r="6" fill="#42283f"/><circle cx="68" cy="50" r="6" fill="#42283f"/>
-          <path d="M44 60 Q55 72 66 60" fill="none" stroke="#42283f" stroke-width="4.5" stroke-linecap="round"/>
-        </svg>
-        <h2>アミラーＺ</h2>
+        <img class="titlelogo" id="titlelogo" src="title-logo.png" alt="アミラーＺ">
+        <h2></h2>
         <p>ゆびで<b>ゴシゴシ往復</b>して温め、<b>適温の帯(緑57〜64℃)</b>で擦るとでんぷんが<b>糖に</b>。全部分解で<b>クリア！</b><br>
         <b>熱すぎ＝失活</b>／<b>冷やしすぎ＝酸敗</b>に注意。<br>
         <span style="font-size:11.5px; color:var(--ink3)">くわしい遊び方は「あそびかた」で体験！</span></p>
@@ -177,7 +170,7 @@
   let runStart=0, elapsed=0, bestTime=null, winIsBest=false, dashT=3, dashHold=0, dashDir=0;
   let sour=0, sourArmed=false, overReason="enzyme";               // 酸敗ゲージ(0..1・不可逆)／作動フラグ(57℃到達で真)／敗因
   let sourSndT=0;                                                 // 酸敗中サウンドの再生間隔タイマー
-  let tutMode=false, tutStep=0, tutGoalMet=false, tutFires=0, tutDenat=0;   // 操作説明チュートリアル（プレイ画面上でコーチ吹き出し／指示を達成すると次へ進める・段階的に操作解除・失活/酸敗しても続行）
+  let tutMode=false, tutStep=0, tutGoalMet=false, tutFires=0, tutDenat=0, tutPaused=false;   // 操作説明チュートリアル。tutPaused=達成した瞬間にゲームを止めて「できた！」を見せる（次へで再開）
   try{ const b=localStorage.getItem('kojiShredBest'); if(b) bestTime=parseFloat(b); }catch(e){}
   (function(){ const d=document.getElementById("dbg"); if(d) d.style.display="none"; })();   // デバッグ表示は隠す（スコアHUDを出すため）
   function fmtTime(s){ s=Math.max(0,s); const m=Math.floor(s/60), sec=s-m*60; return m+":"+(sec<10?"0":"")+sec.toFixed(1); }
@@ -353,12 +346,12 @@
     btn.textContent = last ? "本番スタート！" : (ready ? "次へ ▶" : "やってみよう…");
     btn.classList.toggle("off", !ready);                 // 未達成の間は押せない（グレー）＝指示をこなすと解禁
     c.hidden=false; }
-  function tutGoalReached(){ tutGoalMet=true; beep(660,0.09,"triangle",.06); setTimeout(()=>beep(880,0.12,"triangle",.06),90); showCoach(); }  // 「できた！」チャイム＋『次へ』解禁
+  function tutGoalReached(){ tutGoalMet=true; tutPaused=true; beep(660,0.09,"triangle",.06); setTimeout(()=>beep(880,0.12,"triangle",.06),90); showCoach(); }  // 達成＝ポーズ＋「できた！」チャイム＋『次へ』解禁（凍結して状態を見せる）
   function tutCheck(){ if(!tutMode||tutGoalMet) return; const g=TUT[tutStep].goal; if(g&&g()) tutGoalReached(); }   // 毎フレーム達成判定
-  function startTutorial(){ tutMode=true; tutStep=0; tutGoalMet=false; tutFires=0; tutDenat=0; start(); growT=1; showCoach(); }
+  function startTutorial(){ tutMode=true; tutStep=0; tutGoalMet=false; tutPaused=false; tutFires=0; tutDenat=0; start(); growT=1; showCoach(); }
   function coachNext(){ const st=TUT[tutStep], last=(tutStep>=TUT.length-1);
     if(!last && st.goal && !tutGoalMet) return;          // 指示をこなすまで進めない
-    tutStep++; tutGoalMet=false;
+    tutStep++; tutGoalMet=false; tutPaused=false;         // 次のステップへ＝ポーズ解除して再開
     if(tutStep>=TUT.length){ document.getElementById("coach").hidden=true; tutMode=false; start(); }   // 本番開始
     else showCoach(); }
   document.getElementById("tut").addEventListener("click", ()=>{ const a=ac(); if(a&&a.state==="suspended"){ try{ a.resume(); }catch(_){} } startTutorial(); });
@@ -485,7 +478,7 @@
     return '<div style="text-align:left;display:inline-block;max-width:300px"><span style="font-size:11px;color:var(--ink2)">作った糖</span>'+rows+'</div>';
   }
   function showWinOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
-    ov.querySelector("h2").textContent="ゲームクリア！"; const kn=ov.querySelector(".kun"); if(kn) kn.style.display="none";   // 結果画面は高さ節約のためグルコース君を隠す
+    ov.querySelector("h2").textContent="ゲームクリア！"; const kn=ov.querySelector("#titlelogo"); if(kn) kn.style.display="none";   // 結果画面はタイトルロゴを隠して高さ節約（h2に結果文言）
     const timeLine='<span style="font-size:23px">クリアタイム <b style="color:#EAF6D8">'+fmtTime(elapsed)+'</b></span>'+(winIsBest?' <b style="color:#EAD24E">新記録！</b>':(bestTime!=null?'<br><span style="font-size:12px">ベスト '+fmtTime(bestTime)+'</span>':''));
     const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine+'<br>'+sugarBreakdownHTML();
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
@@ -513,7 +506,7 @@
     setTimeout(showOverOverlay, 900); }
   function showOverOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
     const sr=overReason==="sour";
-    ov.querySelector("h2").textContent= sr?"酸敗…":"ゲームオーバー"; const kn=ov.querySelector(".kun"); if(kn) kn.style.display="none";   // 結果画面は高さ節約
+    ov.querySelector("h2").textContent= sr?"酸敗…":"ゲームオーバー"; const kn=ov.querySelector("#titlelogo"); if(kn) kn.style.display="none";   // 結果画面はタイトルロゴを隠して高さ節約
     const frac=totalStarch?Math.round((1-starch.length/totalStarch)*100):0;
     const lead= sr?"低温が続いて酸敗してしまった…":"酵素がすべて失活してしまった…";
     const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=lead+"<br>分解 <b>"+frac+"%</b><br><br>"+sugarBreakdownHTML();
@@ -559,7 +552,7 @@
   function frame(now){ let dt=Math.min(.05,(now-last)/1000); last=now;
     const rdt = hitstop>0 ? 0 : dt; if(hitstop>0) hitstop-=dt;
 
-    if(running){
+    if(running && !(tutMode&&tutPaused)){   // ★チュートリアルで達成した瞬間はポーズ＝物理（温度/酸敗/擦り）を止めて状態を凍結（次へで再開）
       let spd=Math.min(rawMove, MOVE_CAP); rawMove=0; moved=0; dbgSpd=spd;      // 擦り量＝指の実移動（往復でも円でもOK）
       if(growT<1) spd=0;                                                        // ★デンプン生成完了まで擦っても始まらない（加熱・チャージ・タイマー始動を無効化）
       if(!moveStarted){                                         // ★最初の一擦りまで待機：タイマー0・適温バンド静止（開始直後にいきなり始まらない）
