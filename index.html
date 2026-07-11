@@ -57,7 +57,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v121｜v120ベース】振動を各節individualなバズに戻す（ユーザー好み）。密着(s=0.6L)・結合線なし・spr停止は維持。加熱時に隙間が開くのは許容</span>
+    <span class="hint">【v122｜v121ベース】①発火音を多糖ほど派手に(dp音のアルペジオ＋煌めき＋重低音) ②開始時「デンプン生成中」＋成長アニメ ③高温時に口が開いた表情を混在 ④クリア/GO画面の糖内訳を大きく＋一般名(ブドウ糖等)＋一言説明</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -100,11 +100,11 @@
   const START_T=20, MOVE_CAP=90, STROKE_CAP=90;   // 開始温度 / 1F擦り上限 / 1ストローク距離上限
   const GREEN=[57,64], DENATURE=73;               // 64〜=危険域 / 崖73℃。β失活70℃はデキストリン帯、糖化系崩壊/焦げの“崖”はより高温という整合
   // 温度で出来る糖が変わる（酵素の使い分け）：低温=グルコアミラーゼ→グルコース、中温=β-アミラーゼ→マルトース、高温=α優勢→デキストリン(甘いが崖寸前)
-  const SUGARS=[  // dp=分子中のグルコース数＝発火で一度にちぎれる塊のサイズ（大きい糖ほど沢山ちぎれて速いが高温＝崖リスク）
-    {key:"glu", name:"グルコース",      lo:57,   hi:61,   col:"#6FD8C6", dp:1},
-    {key:"mal", name:"マルトース",      lo:61,   hi:64,   col:"#9BD26F", dp:2},
-    {key:"mt3", name:"マルトトリオース", lo:64,   hi:66.5, col:"#EAD24E", dp:3},
-    {key:"dex", name:"デキストリン",     lo:66.5, hi:73,   col:"#E4883C", dp:5},
+  const SUGARS=[  // dp=分子中のグルコース数＝発火で一度にちぎれる塊のサイズ（大きい糖ほど沢山ちぎれて速いが高温＝崖リスク）／jname=一般名・desc=一言説明（クリア画面の知育表示用）
+    {key:"glu", name:"グルコース",      jname:"ブドウ糖", desc:"単糖。体のエネルギー源になる最も基本的な糖。",   lo:57,   hi:61,   col:"#6FD8C6", dp:1},
+    {key:"mal", name:"マルトース",      jname:"麦芽糖",   desc:"ブドウ糖が2つ連なった二糖。水あめや甘酒の甘み。", lo:61,   hi:64,   col:"#9BD26F", dp:2},
+    {key:"mt3", name:"マルトトリオース", jname:"",         desc:"ブドウ糖が3つ連なった三糖。",                   lo:64,   hi:66.5, col:"#EAD24E", dp:3},
+    {key:"dex", name:"デキストリン",     jname:"",         desc:"ブドウ糖が多数連なった多糖。とろみのもと。",     lo:66.5, hi:73,   col:"#E4883C", dp:5},
   ];
   const MOL_PER_FIRE=4;                           // 1発火で作る“分子の数”。ちぎれる玉数＝dp×これ（分子が大きいほど沢山ちぎれる）
   const GLUCOSE_N=150;                            // ★でんぷんのグルコース節数＝毎回固定（タイムアタックの削る量を一定に）。枝ぶり・うねりだけ毎回ランダム。将来200も検討
@@ -153,6 +153,7 @@
   let shakeX=0,shakeY=0,shakeMag=0, flash=0, bloom=0;
   let starch=[], parts=[], pops=[], rings=[], bonds=[], snaps=[];
   let introField=true;   // 初回start()はチュートリアル背景で見えている分子をそのままプレイ（再生成しない＝見えているもの＝プレイするもの）。「もう一度」以降は新規生成
+  let growT=1;           // でんぷん生成アニメの進捗(0→1)。新規生成/ゲーム開始で0にし、節を成長順に現す＝「デンプン生成中」演出
   let prevTemp=START_T, whooshed=false, dangerBeatT=0, pendingCut={};
   // でんぷんの塊は「左＝酸敗ゲージ／右＝温度計／上＝タイマー／下＝進捗バー」に挟まれた帯の“中央”に置く（重なり＆片寄り防止）
   const FIELD_L=18, FIELD_R=74, FIELD_T=22, FIELD_B=22;           // 各UIを避ける内側マージン（タイム/分解率/酸敗ゲージをDOM＝枠外へ出したので上下＋左を詰め、分子を縦横に広げられる。右は温度計が残る）
@@ -202,6 +203,7 @@
     let mmax=1; for(const u of starch){ const d=Math.hypot(u.ox-mcx,u.oy-mcy); if(d>mmax) mmax=d; }
     for(const u of starch){ u.depth=1-0.45*Math.min(1,Math.hypot(u.ox-mcx,u.oy-mcy)/mmax); }
     totalStarch=starch.length; for(const u of starch) bakeBody(u);   // 本体スプライトを各節ぶん一度だけ焼く
+    growT=0;                                                          // 生成アニメ開始（節を成長順に現す）
   }
 
   // ---- 音 ----
@@ -217,6 +219,12 @@
     const lp=a.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=2000+pow*1200;
     s.connect(lp); lp.connect(g); g.connect(a.destination); s.start();
     beep(110,0.2,"sine",.16); setTimeout(()=>beep(70,0.18,"triangle",.12),18); }
+  function sugarBurstSound(dp,e){ if(muted)return; const a=ac(); if(!a)return;   // 発火の“できた糖”音：多糖(dp大)ほど音数・煌めき・重低音が増えて派手に
+    const base=523+e*36, semis=[0,4,7,11,14], nN=Math.max(1,Math.min(5,dp));      // dp音ぶんの上昇アルペジオ（単糖=1音の素朴／多糖=5音の華やか）
+    for(let i=0;i<nN;i++){ setTimeout(()=>beep(base*Math.pow(2,semis[i]/12), .17, "triangle", .045+dp*0.006), i*42); }
+    beep(96-dp*5, .20+dp*0.03, "sine", .09+dp*0.02);                              // 低い衝撃(boom)：dpで強く深く
+    if(dp>=3) setTimeout(()=>beep(1250+dp*110, .12, "sine", .038), 55);           // 中〜多糖：上に煌めきを重ねる
+    if(dp>=5){ setTimeout(()=>beep(1900, .16, "triangle", .05), 110); setTimeout(()=>beep(2600, .12, "sine", .035), 165); } }  // デキストリン＝特大ファンファーレ
   function windupSound(){ if(muted)return; const a=ac(); if(!a)return; // 頂点へ張り詰める上昇音
     const o=a.createOscillator(),g=a.createGain(); o.type="sawtooth"; const n=a.currentTime;
     o.frequency.setValueAtTime(320,n); o.frequency.exponentialRampToValueAtTime(1250,n+WINDUP);
@@ -289,7 +297,8 @@
     enzymeLife=MAX_LIFE; refreshLife(); runStart=performance.now(); elapsed=0; winIsBest=false;
     dashT=DASH_MIN+Math.random()*(DASH_MAX-DASH_MIN); dashHold=0; dashDir=0; sour=0; sourArmed=false; overReason="enzyme"; moveStarted=false;
     document.getElementById("ov").hidden=true;
-    if(introField){ introField=false; } else { spawnField(); } }   // 初回はチュートリアルで見えている分子をそのままプレイ／2回目以降だけ新規生成
+    if(introField){ introField=false; } else { spawnField(); }     // 初回はチュートリアルで見えている分子をそのままプレイ／2回目以降だけ新規生成
+    growT=0; }                                                     // ゲーム開始時は毎回「デンプン生成中」アニメを再生（初回の流用分子も改めて成長させて見せる）
 
   function startFiring(){ firing=true; fireT=WINDUP; windupSound();
     pendingSugar=sugarAt(zC);                                        // 今の適温の位置で出来る糖を確定（発熱前）→ dp で壊す量が決まる
@@ -314,7 +323,7 @@
     if(nc){ fx/=nc; fy/=nc; } else { fx=px||cx(); fy=py||cy(); }
     fireX=fx; fireY=fy;
     crunch(1.1+e*0.12+dp*0.13); shakeMag=20+e*1.8+dp*4.5+Math.min(nc,24)*0.5; flash=Math.min(.96,.72+dp*.05); bloom=1; hitstop=0.10+e*0.005+dp*0.008; // 爽快感全振り＋高分子ほど派手
-    beep(520+e*72,.13,"triangle",.05);                                // コンボで上がる明るいチャイム
+    sugarBurstSound(dp,e);                                            // できた糖の音＝多糖ほど派手（音数・煌めき・重低音）
     rings.push({x:fx,y:fy,r:16,vr:520+e*44+dp*95+nc*6,w:9+dp*1.9,life:1});  // 主リング（高分子ほど大きく速く）
     rings.push({x:fx,y:fy,r:8,vr:340+e*26+dp*60,w:5+dp*0.9,life:1});
     if(dp>=3) rings.push({x:fx,y:fy,r:22,vr:720+dp*75,w:5,life:1});   // 高分子は追加の大リング
@@ -380,11 +389,20 @@
     pops.push({x:cx(),y:cy()-10,txt:"ぜんぶ分解！",life:2.2,col:"#EAF6D8",age:0,sz:46});
     winFanfare(); setTimeout(showWinOverlay, 950); }
   function winFanfare(){ if(muted)return; [523,659,784,1047,1319].forEach((f,i)=> setTimeout(()=>beep(f,.28,"triangle",.07), i*120)); }
+  function sugarBreakdownHTML(){   // クリア/GO画面の“作った糖”一覧＝糖名＋一般名＋一言説明つき（知育・少し大きめ）
+    const rows=SUGARS.map(s=>{ const n=sugarStock[s.key]||0;
+      return '<div style="margin:7px 0;'+(n>0?'':'opacity:.4;')+'">'
+        +'<b style="color:'+s.col+';font-size:15px">'+s.name+'</b>'
+        +(s.jname?'<span style="color:var(--ink2);font-size:11.5px">（'+s.jname+'）</span>':'')
+        +' <b style="font-size:17px;color:var(--ink)">×'+n+'</b>'
+        +'<div style="font-size:11px;color:var(--ink2);line-height:1.45">'+s.desc+'</div></div>';
+    }).join('');
+    return '<div style="text-align:left;display:inline-block;max-width:300px"><span style="font-size:12px;color:var(--ink2)">作った糖</span>'+rows+'</div>';
+  }
   function showWinOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
     ov.querySelector("h2").textContent="ゲームクリア！";
-    const tot=SUGARS.map(s=>s.name+' <b style="color:'+s.col+'">'+(sugarStock[s.key]||0)+'</b>').join('　');
     const timeLine='<span style="font-size:30px">クリアタイム <b style="color:#EAF6D8">'+fmtTime(elapsed)+'</b></span>'+(winIsBest?' <b style="color:#EAD24E">新記録！</b>':(bestTime!=null?'<br><span style="font-size:12px">ベスト '+fmtTime(bestTime)+'</span>':''));
-    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine+'<br><br><span style="font-size:12px">作った糖：'+tot+"</span>";
+    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine+'<br><br>'+sugarBreakdownHTML();
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
     document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
   function denature(){ denLock=0.5; temp=DENATURE_KNOCK; heatE=0; charge=0; combo=0; firing=false; pendingSugar=null; pendingCut={};  // ★温度は55℃まで押し戻す（全リセットはしない）＝少し登り直す程度でゲーム続行。硬直中は温度固定
@@ -410,9 +428,8 @@
     const sr=overReason==="sour";
     ov.querySelector("h2").textContent= sr?"酸敗…":"ゲームオーバー";
     const frac=totalStarch?Math.round((1-starch.length/totalStarch)*100):0;
-    const tot=SUGARS.map(s=>s.name+' <b style="color:'+s.col+'">'+(sugarStock[s.key]||0)+'</b>').join('　');
     const lead= sr?"低温が続いて酸敗してしまった…":"酵素がすべて失活してしまった…";
-    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=lead+"<br>分解 <b>"+frac+"%</b><br><span style=\"font-size:12px\">作った糖："+tot+"</span>";
+    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=lead+"<br>分解 <b>"+frac+"%</b><br><br>"+sugarBreakdownHTML();
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
     document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
 
@@ -509,7 +526,7 @@
         aimT=temp+heatE;
         if(denLock>0){ denLock-=rdt; temp=_t0; aimT=temp; }     // 失活の硬直中は温度を固定（押し戻した55℃のまま＝硬直中の冷却で酸敗域に落ちない）
         else if(temp>DENATURE){ denature(); }                   // 崖：73℃で失活
-        else if(starch.length && inZone){                       // 崖手前まで、擦った“仕事量”が1ストローク分たまると発火＝でんぷんを削る
+        else if(starch.length && inZone && growT>=1){           // 崖手前まで、擦った“仕事量”が1ストローク分たまると発火＝でんぷんを削る（生成アニメ中は発火しない）
           charge += spd*(activeTouch?TOUCH_CHARGE_MUL:1); if(charge>=SHRED_WORK){ charge=0; startFiring(); }
         } else { charge=Math.max(0, charge-rdt*40); }           // ゾーン外/塊なしでは仕事は少しずつ抜ける
       }
@@ -588,7 +605,9 @@
         if(u._y<8)u._y=8; else if(u._y>H-8)u._y=H-8; }
       // ※結合線（ボール&スティックの棒）は廃止＝節を密着オーバーラップさせ“みっちり繋がった塊”で連結を表現
       // ②玉本体を描く。縁(奥/暗)→中心(手前/明)の重なりでドーム状の立体
-      const drawOrder=starch.slice().sort((a,b)=>a.depth-b.depth);
+      if(growT<1) growT=Math.min(1, growT+rdt/1.2);                   // でんぷん生成アニメ（約1.2秒）
+      const revealN = growT>=1 ? starch.length : Math.ceil((1-(1-growT)*(1-growT))*starch.length);   // 成長順(id)にease-outで現す
+      const drawOrder=(growT>=1?starch.slice():starch.filter(u=>u.id<revealN)).sort((a,b)=>a.depth-b.depth);
       const shrink=1-fp*0.18;                                        // 発火寸止めで全体が少し縮む
       // ②-a 本体スプライトをdrawImageで貼る（焼き済み＝グラデ塗り/陰/輪郭/目を再計算しない）。発火の縮みと微小回転だけ本編で
       for(const u of drawOrder){ const R=u.sprR*shrink, rot=Math.sin(u.ph)*0.06;
@@ -602,7 +621,8 @@
       // ②-c 口：状態(scared/face)で変わるので毎フレーム。全玉を1パスにまとめて一括stroke（微小回転は無視）
       ctx.strokeStyle="#42283f"; ctx.lineWidth=2.4; ctx.lineCap="round"; ctx.beginPath();
       for(const u of drawOrder){ const s=u.s*shrink, x=u._x, y=u._y;
-        if(scared){ ctx.moveTo(x-s*.16, y+s*.34); ctx.arc(x, y+s*.34, s*.16, Math.PI, 0, true); }
+        if(scared){ if(u.face===0){ ctx.moveTo(x+s*.15, y+s*.28); ctx.ellipse(x, y+s*.28, s*.15, s*.19, 0, 0, 6.283); }  // 高温時：口が開いた表情（アチチ/驚き）を混ぜる
+          else { ctx.moveTo(x-s*.16, y+s*.34); ctx.arc(x, y+s*.34, s*.16, Math.PI, 0, true); } }                        // 従来の困り顔
         else if(u.face===1){ ctx.moveTo(x+Math.cos(.1)*s*.14, y+s*.2+Math.sin(.1)*s*.14); ctx.arc(x, y+s*.2, s*.14, .1, Math.PI-.1); }
         else { ctx.moveTo(x-s*.16, y+s*.3); ctx.lineTo(x+s*.16, y+s*.3); } }
       ctx.stroke();
@@ -614,6 +634,11 @@
         const mx=(a._x+b._x)/2, my=(a._y+b._y)/2, s=3+fp*7;
         ctx.strokeStyle="#FF5A3C"; ctx.lineWidth=3;
         ctx.beginPath(); ctx.moveTo(mx-s,my-s); ctx.lineTo(mx+s,my+s); ctx.moveTo(mx+s,my-s); ctx.lineTo(mx-s,my+s); ctx.stroke(); } }
+      // 生成中の表示「デンプン生成中…」（節が成長順に現れる間）
+      if(growT<1){ ctx.save(); ctx.textAlign="center"; ctx.textBaseline="middle";
+        const nd=1+(Math.floor(performance.now()/300)%3);
+        ctx.fillStyle="rgba(243,234,219,0.9)"; ctx.font="800 17px 'Hiragino Kaku Gothic ProN',sans-serif";
+        ctx.fillText("デンプン生成中"+"・".repeat(nd), cx(), 42); ctx.restore(); }
     }
     // はみ出し帯(64〜70)＝崖の予感：画面ふちが茶色く締まってヒリつく（緩めれば戻れる）
     if(temp>GREEN[1] && !firing){
