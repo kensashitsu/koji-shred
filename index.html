@@ -57,7 +57,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v117｜v116ベース】発火の衝撃波を周囲へ伝播：破壊点の近くに残った節を外へ突き飛ばし→位置バネで揺り戻す＝爆発で配列が波打って乱れる。高分子ほど強い。結合線も追従</span>
+    <span class="hint">【v118｜v117ベース】衝撃の乱れを恒久化：突き飛ばし後“元の位置”でなく“ずれた新位置”へ収束＝発火のたびに乱れが累積し分子が壊れていく（乱れっぱなし）。元位置からの最大ドリフトで暴走防止</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -172,9 +172,9 @@
     const minD2=(L*0.82)*(L*0.82);
     const inside=(x,y)=> (x*x)/(rx*rx)+(y*y)/(ry*ry) <= 1;         // 楕円フィールドの内側だけに置く
     const collide=(x,y)=>{ for(const u of starch){ const dx=u.ox-x, dy=u.oy-y; if(dx*dx+dy*dy<minD2) return true; } return false; };  // 自己回避＝読める樹形
-    const add=(x,y)=>{ starch.push({id, ox:x, oy:y, s, depth:0.9+Math.random()*0.1, ph:Math.random()*6.28,
+    const add=(x,y)=>{ starch.push({id, ox:x, oy:y, ox0:x, oy0:y, s, depth:0.9+Math.random()*0.1, ph:Math.random()*6.28,
       face:(Math.random()*3|0), tone:(Math.random()+Math.random()-1), lum:(Math.random()+Math.random()-1),
-      kx:0, ky:0, kvx:0, kvy:0}); return id++; };   // kx/ky=発火の衝撃波で受ける一時変位（バネで0へ戻る）
+      kx:0, ky:0, kvx:0, kvy:0}); return id++; };   // ox0/oy0=元位置（ドリフト上限用）。ox/oy=現rest（衝撃で恒久的にずれる＝乱れが累積）。kx/ky=ワブルの一時変位（新restへバネで収束）
     const curl=0.30+Math.random()*0.55, branchP=0.05+Math.random()*0.15;   // ★毎回ランダム：うねり・枝分かれ確率
     const sx=(Math.random()-0.5)*rx*0.2, sy=(Math.random()-0.5)*ry*0.2, a0=Math.random()*6.28;
     const seed=add(sx,sy);
@@ -347,10 +347,15 @@
       parts.push({x:fx,y:fy,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-2,life:1.1,sz:2+Math.random()*2.6,col:sug?sug.col:"#9BD26F",spark:true}); }
     // 破壊後の残り
     starch=starch.filter(u=>!cut[u.id]);
-    // ★爆発の衝撃波：破壊点(fx,fy)の周囲に残った節を外へ突き飛ばす（距離で減衰）→位置バネで揺り戻す＝配列に乱れが伝わる。高分子(dp)ほど強い
-    if(!reduce){ const R=latticeD*7, R2=R*R, SH=180+dp*130;
+    // ★爆発の衝撃波：破壊点(fx,fy)の周囲に残った節を外へ。勢い(ワブル)＋恒久ずれ(乱れっぱなし・累積)＝分子が壊れていく。高分子(dp)ほど強い／元位置からの最大ドリフトMAXDで暴走防止
+    if(!reduce){ const R=latticeD*7, R2=R*R, SHV=140+dp*100, PERM=10+dp*6, MAXD=latticeD*2.2;
       for(const u of starch){ const dx=u._x-fx, dy=u._y-fy, d2=dx*dx+dy*dy;
-        if(d2>1 && d2<R2){ const d=Math.sqrt(d2), k=1-d/R, f=SH*k*k/d; u.kvx+=dx*f; u.kvy+=dy*f; } } }
+        if(d2>1 && d2<R2){ const d=Math.sqrt(d2), nx=dx/d, ny=dy/d, kk=(1-d/R)*(1-d/R);
+          u.kvx+=nx*SHV*kk; u.kvy+=ny*SHV*kk;                        // 突き飛ばしの勢い（オーバーシュートのワブル）
+          const px0=u.ox, py0=u.oy;                                  // rest位置を外へ恒久移動（ドリフト上限でクランプ）
+          u.ox=Math.max(u.ox0-MAXD,Math.min(u.ox0+MAXD, u.ox+nx*PERM*kk));
+          u.oy=Math.max(u.oy0-MAXD,Math.min(u.oy0+MAXD, u.oy+ny*PERM*kk));
+          u.kx-=(u.ox-px0); u.ky-=(u.oy-py0); } } }               // 見かけ位置は不変にして、次フレームからバネで“ずれた新rest”へ滑らかに寄る＝乱れが残る
     bonds=bonds.filter(bd=>!(cut[bd.a]||cut[bd.b]));
     pendingCut={};
     // 出来た糖の“分子の数”をストック（壊した玉数nc ÷ 分子サイズdp）→ 糖名ポップ＆チップ加算
