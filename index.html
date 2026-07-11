@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>ズタッ！ — 余熱の滑りで適温に着地、デンプンを切る</title>
+<title>アミラーＺ — 適温でデンプンを切って糖にする</title>
 <style>
   :root{ --bg:#211A12; --card:#2A2118; --ink:#F3EADB; --ink2:#B7A88C; --accent:#E0B24A; --green:#7FBE5A; --red:#E4553A; }
   *{box-sizing:border-box} html,body{height:100%}
@@ -57,7 +57,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v122｜v121ベース】①発火音を多糖ほど派手に(dp音のアルペジオ＋煌めき＋重低音) ②開始時「デンプン生成中」＋成長アニメ ③高温時に口が開いた表情を混在 ④クリア/GO画面の糖内訳を大きく＋一般名(ブドウ糖等)＋一言説明</span>
+    <span class="hint">【v123｜v122ベース】タイトルを「アミラーＺ」に／チュートリアル背景では生成アニメを出さず完成分子を静止表示（生成はゲーム開始時のみ）／発火音をアルペジオ→多糖ほど大きく低く長い破裂音に／生成スピードを約2.2秒にゆっくり化</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -73,7 +73,7 @@
     <div id="dbg" style="position:absolute;top:8px;left:10px;z-index:6;pointer-events:none;font:700 12px ui-monospace,Menlo,Consolas,monospace;color:#8fe3c8;text-shadow:0 1px 2px rgba(0,0,0,.6)"></div>
     <div class="overlay" id="ov">
       <div>
-        <h2>ズタッ！</h2>
+        <h2>アミラーＺ</h2>
         <p><b>①</b> 画面を<b>ゆびでゴシゴシ</b>こする＝温まる（<b>速く往復</b>するほど熱い）<br>
         <b>②</b> 右の温度計が<b>適温の帯</b>で擦ると<b>でんぷんが糖に</b>。<b>全部こわせばクリア！</b><br>
         <b>③</b> 熱くしすぎると<b>酵素が失活</b>（3つで終了）。<b>アツくなったら手を止めて冷ませ。</b><br>
@@ -203,8 +203,7 @@
     let mmax=1; for(const u of starch){ const d=Math.hypot(u.ox-mcx,u.oy-mcy); if(d>mmax) mmax=d; }
     for(const u of starch){ u.depth=1-0.45*Math.min(1,Math.hypot(u.ox-mcx,u.oy-mcy)/mmax); }
     totalStarch=starch.length; for(const u of starch) bakeBody(u);   // 本体スプライトを各節ぶん一度だけ焼く
-    growT=0;                                                          // 生成アニメ開始（節を成長順に現す）
-  }
+  }   // ※生成アニメ(growT=0)はstart()側だけで開始＝起動時のチュートリアル背景では生成を見せず、完成した分子を静止表示
 
   // ---- 音 ----
   let AC=null,muted=false;
@@ -219,12 +218,26 @@
     const lp=a.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=2000+pow*1200;
     s.connect(lp); lp.connect(g); g.connect(a.destination); s.start();
     beep(110,0.2,"sine",.16); setTimeout(()=>beep(70,0.18,"triangle",.12),18); }
-  function sugarBurstSound(dp,e){ if(muted)return; const a=ac(); if(!a)return;   // 発火の“できた糖”音：多糖(dp大)ほど音数・煌めき・重低音が増えて派手に
-    const base=523+e*36, semis=[0,4,7,11,14], nN=Math.max(1,Math.min(5,dp));      // dp音ぶんの上昇アルペジオ（単糖=1音の素朴／多糖=5音の華やか）
-    for(let i=0;i<nN;i++){ setTimeout(()=>beep(base*Math.pow(2,semis[i]/12), .17, "triangle", .045+dp*0.006), i*42); }
-    beep(96-dp*5, .20+dp*0.03, "sine", .09+dp*0.02);                              // 低い衝撃(boom)：dpで強く深く
-    if(dp>=3) setTimeout(()=>beep(1250+dp*110, .12, "sine", .038), 55);           // 中〜多糖：上に煌めきを重ねる
-    if(dp>=5){ setTimeout(()=>beep(1900, .16, "triangle", .05), 110); setTimeout(()=>beep(2600, .12, "sine", .035), 165); } }  // デキストリン＝特大ファンファーレ
+  function sugarBurstSound(dp,e){ if(muted)return; const a=ac(); if(!a)return;   // 発火の破裂音：多糖(dp大)ほど“大きく・低く・長い”爆発（ドンッ→ドバーン）。メロディ無しの純パーカッシブ
+    const now=a.currentTime;
+    // ① ノイズ爆発：dpで長く・こもって・大きく（減衰を緩やかにして尾を伸ばす）
+    const dur=0.15+dp*0.05, buf=a.createBuffer(1,Math.max(1,(a.sampleRate*dur)|0),a.sampleRate), ch=buf.getChannelData(0);
+    for(let i=0;i<ch.length;i++){ ch[i]=(Math.random()*2-1)*Math.pow(1-i/ch.length, 2.0-dp*0.12); }
+    const src=a.createBufferSource(); src.buffer=buf;
+    const lp=a.createBiquadFilter(); lp.type="lowpass"; lp.frequency.setValueAtTime(3200+e*180, now); lp.frequency.exponentialRampToValueAtTime(360, now+dur);
+    const g=a.createGain(); g.gain.value=0.42+dp*0.07;
+    src.connect(lp); lp.connect(g); g.connect(a.destination); src.start(now);
+    // ② 重低音の落下（ドン）：dpで低く・長く・強く
+    const o=a.createOscillator(), og=a.createGain(); o.type="sine";
+    o.frequency.setValueAtTime(160+dp*8, now); o.frequency.exponentialRampToValueAtTime(Math.max(28,42-dp*2), now+0.13+dp*0.025);
+    og.gain.setValueAtTime(0.11+dp*0.03, now); og.gain.exponentialRampToValueAtTime(0.0001, now+0.18+dp*0.035);
+    o.connect(og); og.connect(a.destination); o.start(now); o.stop(now+0.26+dp*0.04);
+    // ③ 高分子は二段目の爆発を少し遅らせて重ねる＝ドバーンと派手
+    if(dp>=3){ setTimeout(()=>{ const a2=ac(); if(!a2)return; const t2=a2.currentTime;
+      const b2=a2.createBuffer(1,(a2.sampleRate*0.16)|0,a2.sampleRate), c2=b2.getChannelData(0);
+      for(let i=0;i<c2.length;i++) c2[i]=(Math.random()*2-1)*Math.pow(1-i/c2.length,1.4);
+      const s2=a2.createBufferSource(); s2.buffer=b2; const lp2=a2.createBiquadFilter(); lp2.type="lowpass"; lp2.frequency.value=1200+dp*120;
+      const g2=a2.createGain(); g2.gain.value=0.3+dp*0.04; s2.connect(lp2); lp2.connect(g2); g2.connect(a2.destination); s2.start(t2); }, 45); } }
   function windupSound(){ if(muted)return; const a=ac(); if(!a)return; // 頂点へ張り詰める上昇音
     const o=a.createOscillator(),g=a.createGain(); o.type="sawtooth"; const n=a.currentTime;
     o.frequency.setValueAtTime(320,n); o.frequency.exponentialRampToValueAtTime(1250,n+WINDUP);
@@ -605,7 +618,7 @@
         if(u._y<8)u._y=8; else if(u._y>H-8)u._y=H-8; }
       // ※結合線（ボール&スティックの棒）は廃止＝節を密着オーバーラップさせ“みっちり繋がった塊”で連結を表現
       // ②玉本体を描く。縁(奥/暗)→中心(手前/明)の重なりでドーム状の立体
-      if(growT<1) growT=Math.min(1, growT+rdt/1.2);                   // でんぷん生成アニメ（約1.2秒）
+      if(growT<1) growT=Math.min(1, growT+rdt/2.2);                   // でんぷん生成アニメ（約2.2秒＝ゆっくり見せる）
       const revealN = growT>=1 ? starch.length : Math.ceil((1-(1-growT)*(1-growT))*starch.length);   // 成長順(id)にease-outで現す
       const drawOrder=(growT>=1?starch.slice():starch.filter(u=>u.id<revealN)).sort((a,b)=>a.depth-b.depth);
       const shrink=1-fp*0.18;                                        // 発火寸止めで全体が少し縮む
