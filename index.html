@@ -83,7 +83,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v133｜v132ベース】あそびかた：冒頭に「デンプンは毎回ランダム生成＋糖の集合体」の説明ステップ（生成アニメを見せる）を追加、最後に「タイムアタックを目指そう」を追加。ゲート番号を+1に更新</span>
+    <span class="hint">【v134｜v133ベース】分子に<b>アミロース(直鎖・青)</b>を追加。白米準拠でアミロース2:アミロペクチン8を毎回固定(タイムアタック整合)。アミロースは硬く1擦りで<b>半分しか千切れない</b>(pickCut半減)。あそびかた冒頭にアミロース/アミロペクチンの違いの説明を追加</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -143,6 +143,7 @@
   ];
   const MOL_PER_FIRE=4;                           // 1発火で作る“分子の数”。ちぎれる玉数＝dp×これ（分子が大きいほど沢山ちぎれる）
   const GLUCOSE_N=150;                            // ★でんぷんのグルコース節数＝毎回固定（タイムアタックの削る量を一定に）。枝ぶり・うねりだけ毎回ランダム。将来200も検討
+  const AMYLOSE_FRAC=0.20;                         // ★白米準拠：アミロース2:アミロペクチン8。組成も毎回固定（引きでタイムが変わらないよう＝タイムアタック整合）。アミロース＝直鎖で硬く、1擦りで半分しか千切れない（pickCutで半減）
   const CIRC=['','①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
   const MAX_LIFE=3;                               // 酵素ライフ。崖(失活)ごとに1つ失い、ゼロでゲームオーバー
   function sugarAt(t){ for(const s of SUGARS) if(t>=s.lo && t<s.hi) return s; return SUGARS[t>=70?3:0]; }
@@ -200,7 +201,7 @@
   const cy=()=>(FIELD_T + (H-FIELD_B))/2;                          // 帯の垂直中央
 
   let latticeD=0;
-  function spawnField(){   // ★デンプンの化学模式図（アミロペクチン＝幹α1-4＋枝α1-6の樹状重合体）を種から成長。節数は固定GLUCOSE_Nで、枝ぶり・うねりだけ毎回ランダム＝毎ゲーム違う分子だが削る量は一定
+  function spawnField(){   // ★デンプンの化学模式図を種から成長。枝分かれ＝アミロペクチン(幹α1-4＋枝α1-6)／直鎖＝アミロース。組成は白米準拠(AMYLOSE_FRAC)で毎回固定＝タイムアタック整合。枝ぶり・うねりだけランダム
     starch=[]; bonds=[]; let id=0;
     const rx=fieldRx();
     const ry=Math.min((H-FIELD_T-FIELD_B)/2 - 10, rx*1.85);       // ★縦の帯を使う（真円キャップを撤廃）＝上下エリアも生成に使う。プレイ枠が広がった分やや縦長（1.85:1上限）
@@ -210,30 +211,49 @@
     const minD2=(L*0.82)*(L*0.82);
     const inside=(x,y)=> (x*x)/(rx*rx)+(y*y)/(ry*ry) <= 1;         // 楕円フィールドの内側だけに置く
     const collide=(x,y)=>{ for(const u of starch){ const dx=u.ox-x, dy=u.oy-y; if(dx*dx+dy*dy<minD2) return true; } return false; };  // 自己回避＝読める樹形
-    const add=(x,y)=>{ starch.push({id, ox:x, oy:y, ox0:x, oy0:y, s, depth:0.9+Math.random()*0.1, ph:Math.random()*6.28,
+    const add=(x,y,poly)=>{ starch.push({id, ox:x, oy:y, ox0:x, oy0:y, s, poly, depth:0.9+Math.random()*0.1, ph:Math.random()*6.28,
       face:(Math.random()*3|0), tone:(Math.random()+Math.random()-1), lum:(Math.random()+Math.random()-1),
-      kx:0, ky:0, kvx:0, kvy:0}); return id++; };   // ox0/oy0=元位置（ドリフト上限用）。ox/oy=現rest（衝撃で恒久的にずれる＝乱れが累積）。kx/ky=ワブルの一時変位（新restへバネで収束）
-    const curl=0.30+Math.random()*0.55, branchP=0.05+Math.random()*0.15;   // ★毎回ランダム：うねり・枝分かれ確率
-    const sx=(Math.random()-0.5)*rx*0.2, sy=(Math.random()-0.5)*ry*0.2, a0=Math.random()*6.28;
-    const seed=add(sx,sy);
-    const tips=[ {x:sx,y:sy,prev:seed,dir:a0,depth:0}, {x:sx,y:sy,prev:seed,dir:a0+Math.PI,depth:0} ];   // 幹は両方向へ
-    let guard=0; const GMAX=N*140;
-    while(starch.length<N && guard++<GMAX){
-      if(tips.length===0){                                        // 全枝が行き止まり→既存ノードから再出芽して必ずNへ（＝節数固定を保証、連結も維持）
-        let re=false;
-        for(let t=0;t<30;t++){ const bi=(Math.random()*starch.length)|0, b=starch[bi], dir=Math.random()*6.28;
-          const nx=b.ox+Math.cos(dir)*L, ny=b.oy+Math.sin(dir)*L;
-          if(inside(nx,ny)&&!collide(nx,ny)){ tips.push({x:b.ox,y:b.oy,prev:b.id,dir,depth:1}); re=true; break; } }
-        if(!re) break; continue;
+      kx:0, ky:0, kvx:0, kvy:0}); return id++; };   // poly='am'(アミロース)/'ap'(アミロペクチン)。ox0/oy0=元位置。ox/oy=現rest（衝撃で恒久ずれ）。kx/ky=ワブルの一時変位
+    function grow(count, poly, branchP, curl){    // 1本の分子を成長。branchP=枝分かれ確率（アミロペクチン>0／アミロース=0で直鎖）、curl=うねり
+      if(count<=0) return; const startIdx=starch.length;
+      let sx=0, sy=0, seeded=false;               // 種：まず楕円内のランダム位置、埋まっていれば既存ノード周辺の空きへ（隙間に生やす）
+      for(let t=0;t<300 && !seeded;t++){
+        if(starch.length && t>=40){ const b=starch[(Math.random()*starch.length)|0], dir=Math.random()*6.28, rr=L*(1.2+Math.random());
+          sx=b.ox+Math.cos(dir)*rr; sy=b.oy+Math.sin(dir)*rr; }
+        else { sx=(Math.random()-0.5)*rx*1.5; sy=(Math.random()-0.5)*ry*1.5; }
+        if(inside(sx,sy)&&!collide(sx,sy)) seeded=true;
       }
-      const tip=tips[0]; let ok=false, nd, nx, ny;
-      for(let tryi=0; tryi<6; tryi++){ nd=tip.dir+(Math.random()-0.5)*curl*2+(tryi?(Math.random()-0.5)*1.5:0);
-        nx=tip.x+Math.cos(nd)*L; ny=tip.y+Math.sin(nd)*L; if(inside(nx,ny)&&!collide(nx,ny)){ ok=true; break; } }
-      if(!ok){ tips.shift(); continue; }
-      const idx=add(nx,ny); bonds.push({a:tip.prev, b:idx});      // グリコシド結合＝1本の連結した木（bonds = 節数-1）
-      tip.x=nx; tip.y=ny; tip.prev=idx; tip.dir=nd;
-      if(tip.depth<3 && Math.random()<branchP){ const bd=nd+(Math.random()<0.5?1:-1)*(0.7+Math.random()*0.6);
-        tips.push({x:nx,y:ny,prev:idx,dir:bd,depth:tip.depth+1}); }
+      if(!seeded) return;                          // 空きが無ければ諦め（下の節数保証ループが埋める）
+      const a0=Math.random()*6.28, seed=add(sx,sy,poly);
+      const tips=[ {x:sx,y:sy,prev:seed,dir:a0,depth:0}, {x:sx,y:sy,prev:seed,dir:a0+Math.PI,depth:0} ];   // 幹は両方向へ
+      let guard=0; const GMAX=count*140;
+      while(starch.length-startIdx<count && guard++<GMAX){
+        if(tips.length===0){                                      // 全枝が行き止まり→“同じ分子”の既存ノードから再出芽（連結を保つ）
+          let re=false;
+          for(let t=0;t<30;t++){ const bi=startIdx+((Math.random()*(starch.length-startIdx))|0), b=starch[bi], dir=Math.random()*6.28;
+            const nx=b.ox+Math.cos(dir)*L, ny=b.oy+Math.sin(dir)*L;
+            if(inside(nx,ny)&&!collide(nx,ny)){ tips.push({x:b.ox,y:b.oy,prev:b.id,dir,depth:1}); re=true; break; } }
+          if(!re) break; continue;
+        }
+        const tip=tips[0]; let ok=false, nd, nx, ny;
+        for(let tryi=0; tryi<6; tryi++){ nd=tip.dir+(Math.random()-0.5)*curl*2+(tryi?(Math.random()-0.5)*1.5:0);
+          nx=tip.x+Math.cos(nd)*L; ny=tip.y+Math.sin(nd)*L; if(inside(nx,ny)&&!collide(nx,ny)){ ok=true; break; } }
+        if(!ok){ tips.shift(); continue; }
+        const idx=add(nx,ny,poly); bonds.push({a:tip.prev, b:idx});   // グリコシド結合＝1本の連結した木
+        tip.x=nx; tip.y=ny; tip.prev=idx; tip.dir=nd;
+        if(tip.depth<3 && Math.random()<branchP){ const bd=nd+(Math.random()<0.5?1:-1)*(0.7+Math.random()*0.6);
+          tips.push({x:nx,y:ny,prev:idx,dir:bd,depth:tip.depth+1}); }
+      }
+    }
+    const N_am=Math.round(N*AMYLOSE_FRAC), N_ap=N-N_am;
+    grow(N_am, 'am', 0.0,  0.16+Math.random()*0.22);                    // ★アミロース＝直鎖(枝なし・低うねり)を“空の盤面に先に”確保＝必ずN_am個置ける（硬い青い鎖）。組成を固定＝タイムアタック整合
+    grow(N_ap, 'ap', 0.05+Math.random()*0.15, 0.30+Math.random()*0.55); // アミロペクチン＝枝分かれで残りを埋める
+    let guard2=0;                                                       // ★節数固定を保証：足りない分は必ず“アミロペクチンとして”追加（アミロースは既に確定30個＝ここで増やさない）。空きスポットを探し最近傍に連結
+    while(starch.length<N && guard2++<N*400){
+      const x=(Math.random()-0.5)*rx*1.98, y=(Math.random()-0.5)*ry*1.98;
+      if(!inside(x,y)||collide(x,y)) continue;
+      let bi=-1,bd2=1e18; for(let k=0;k<starch.length;k++){ const dx=starch[k].ox-x, dy=starch[k].oy-y, d2=dx*dx+dy*dy; if(d2<bd2){bd2=d2;bi=k;} }
+      const idx=add(x,y,'ap'); if(bi>=0) bonds.push({a:starch[bi].id,b:idx});
     }
     // 集合的な立体感（サンプルのドーム状の“山”）＝分子の重心から遠い節ほど暗く沈める（中心=手前で明るい／縁=奥で暗い）
     let mcx=0,mcy=0; for(const u of starch){ mcx+=u.ox; mcy+=u.oy; } mcx/=starch.length||1; mcy/=starch.length||1;
@@ -341,7 +361,7 @@
   // ---- 操作説明チュートリアル（プレイ画面上でコーチ吹き出し／失活・酸敗しても続行＝安全に練習）----
   // 段階的チュートリアル：各ステップは「指示text」と「達成条件goal」を持つ。goalを満たすと『次へ』が解禁＝内容に沿って順番に体験。firing(糖に切る)はstep②から解禁＝徐々に操作解除
   const TUT=[
-    { text:"👀 これが<b>デンプン</b>！ゲームのたびに<b>毎回ランダムに生成</b>されるよ。実はデンプンは<b>グルコース(糖)がたくさん連なった集合体</b>なんだ🔬 これを酵素で切って糖にしていくよ",
+    { text:"👀 これが<b>デンプン</b>！<b>毎回ランダムに生成</b>されるよ。デンプンは<b>グルコース(糖)の集合体</b>で、枝分かれした<b>アミロペクチン</b>(切れやすい)と、<b style='color:#8FB4E8'>青い直鎖のアミロース</b>(硬くて半分しか切れない)でできてる🔬 白米はだいたい<b>8:2</b>。これを酵素で切って糖にしていくよ",
       goal:null },
     { text:"① まず指で画面を<b>ゴシゴシ往復</b>してこすってみよう🔥 右の温度計を<b>50℃くらい</b>まで（速いほど熱い／片道はダメ）",
       goal:()=>temp>=50 },
@@ -414,9 +434,11 @@
     let sx=0,sy=0,n=0; for(const id in pendingCut){ const u=starch.find(v=>v.id==id); if(u){sx+=cx()+u.ox; sy+=cy()+u.oy; n++;} }
     fireX = n?sx/n:(px||cx()); fireY = n?sy/n:(py||cy()); }              // 破壊点＝壊す玉の中心（発火中の閃光もここ）
   function pickCut(dp){ const o={}; if(!starch.length) return o;      // 指の下から、糖の分子サイズ×分子数ぶんの玉をまとめて壊す
-    const want=Math.min(starch.length, (dp||1)*MOL_PER_FIRE);
     const tx=px-cx(), ty=py-cy();
-    const order=starch.map(u=>[ (u.ox-tx)*(u.ox-tx)+(u.oy-ty)*(u.oy-ty), u.id ]).sort((a,b)=>a[0]-b[0]);
+    const order=starch.map(u=>[ (u.ox-tx)*(u.ox-tx)+(u.oy-ty)*(u.oy-ty), u.id, u.poly ]).sort((a,b)=>a[0]-b[0]);
+    let per=(dp||1)*MOL_PER_FIRE;
+    if(order[0][2]==='am') per=Math.ceil(per/2);                      // ★アミロース(直鎖)を狙うと硬くて“半分”しか千切れない＝壊れにくい設定（白米のレジスタントスターチ的挙動）。狙う場所＝一番近い節のpolyで判定
+    const want=Math.min(starch.length, per);
     for(let i=0;i<want;i++) o[order[i][1]]=1;
     return o; }
   function shred(){
@@ -553,16 +575,20 @@
   function makeGrad(s,tone,lum){ const g=ctx.createRadialGradient(-s*.2,-s*.3,0,0,0,s);   // 玉のドーム状グラデ。玉ごとに一度だけ作ってu.gradにキャッシュ→毎フレーム生成を廃止（重さの主因）
     g.addColorStop(0,toneStop(244,207,233,tone,lum)); g.addColorStop(.65,toneStop(224,169,209,tone,lum)); g.addColorStop(1,toneStop(192,131,182,tone,lum)); return g; }
   // 玉“本体”（グラデ塗り＋奥ゆき陰＋輪郭＋目）は毎フレーム不変→オフスクリーンに一度だけ焼いて、本編ではdrawImageで貼る（毎フレームのパス塗り/グラデ生成を全廃＝スマホでの主負荷を除去）。口とtintは状態で変わるので本編側で軽く重ねる
+  // 分子ごとの塗り分け：アミロペクチン=暖ピンク（切れやすい）／アミロース=寒色の藍（硬い＝半分しか切れない）。色で「硬さ」がひと目で分かる＝どこを狙う/避けるかの戦略に直結
+  const AP_PAL=[[247,214,237],[227,175,213],[197,139,187],"rgba(120,78,112,0.55)","#4a2f47"];  // ドーム3色＋輪郭＋目
+  const AM_PAL=[[201,215,240],[150,170,214],[104,128,182],"rgba(70,86,128,0.62)","#2c3550"];   // 藍寄りのくすみ色＝締まって硬い印象
   function bakeBody(u){ const s=u.s, pad=3, R=s+pad, size=Math.max(1,Math.ceil(R*2*DPR));
     const c=document.createElement("canvas"); c.width=size; c.height=size;
     const g=c.getContext("2d"); g.setTransform(DPR,0,0,DPR,0,0); g.translate(R,R);
     g.beginPath(); for(let i=0;i<6;i++){ const a=-Math.PI/2+i*Math.PI/3; g.lineTo(Math.cos(a)*s, Math.sin(a)*s*1.02); } g.closePath();
+    const P = u.poly==='am' ? AM_PAL : AP_PAL;
     const gr=g.createRadialGradient(-s*.22,-s*.30,0,0,0,s*1.02);       // 柔らかいパステルのドーム（サンプル寄り＝コントラスト控えめ）
-    gr.addColorStop(0,toneStop(247,214,237,u.tone,u.lum)); gr.addColorStop(.6,toneStop(227,175,213,u.tone,u.lum)); gr.addColorStop(1,toneStop(197,139,187,u.tone,u.lum));
+    gr.addColorStop(0,toneStop(P[0][0],P[0][1],P[0][2],u.tone,u.lum)); gr.addColorStop(.6,toneStop(P[1][0],P[1][1],P[1][2],u.tone,u.lum)); gr.addColorStop(1,toneStop(P[2][0],P[2][1],P[2][2],u.tone,u.lum));
     g.fillStyle=gr; g.fill();
     const shade=(1-u.depth)*0.5; if(shade>0){ g.fillStyle="rgba(28,14,34,"+shade.toFixed(2)+")"; g.fill(); }   // 重心からの“山”陰影（縁ほど暗く沈む＝塊の立体）
-    g.lineWidth=1.2; g.strokeStyle="rgba(120,78,112,0.55)"; g.stroke();  // 細く柔らかい輪郭（硬いシール感を避ける）
-    g.fillStyle="#4a2f47"; const ex=s*.32, ey=s*.04, er=s*.15;          // 目（大きめで明瞭・色はやや柔らかく）
+    g.lineWidth=1.2; g.strokeStyle=P[3]; g.stroke();                    // 細く柔らかい輪郭（硬いシール感を避ける）
+    g.fillStyle=P[4]; const ex=s*.32, ey=s*.04, er=s*.15;               // 目（大きめで明瞭・色はやや柔らかく）
     g.beginPath(); g.arc(-ex,-ey,er,0,7); g.arc(ex,-ey,er,0,7); g.fill();
     u.spr=c; u.sprR=R; }
   function drawUnit(x,y,s,rot,face,scared,tint,shade,tone,lum,grad){ tint=tint||0; shade=shade||0; tone=tone||0; lum=lum||0;
