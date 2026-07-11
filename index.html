@@ -83,7 +83,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v135｜v134ベース】全体量を150→180に増量、アミロース割合を20%→30%(≒7:3)に増加。あそびかたの各糖カードに「青いアミロースは切れる数が半分」の注記を追加。冒頭説明も7:3に更新</span>
+    <span class="hint">【v136｜v135ベース】生成ロジック刷新：アミロース=分岐しない直鎖(複数本)／アミロペクチン=連結した枝分かれ木に分離。自己回避を「親は距離L(連結)・他ノードはNODE_SEP離す」に変更＝別の枝が団子化せず隙間ができ枝分かれが読める。孤立小島を作らない(新種は木単位)。総量180→120に減量。組成120/am36/ap84で固定</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -142,8 +142,12 @@
     {key:"dex", name:"デキストリン",     jname:"",         desc:"ブドウ糖が多数連なった多糖。とろみのもと。",     lo:66.5, hi:73,   col:"#E4883C", dp:5},
   ];
   const MOL_PER_FIRE=4;                           // 1発火で作る“分子の数”。ちぎれる玉数＝dp×これ（分子が大きいほど沢山ちぎれる）
-  const GLUCOSE_N=180;                            // ★でんぷんのグルコース節数＝毎回固定（タイムアタックの削る量を一定に）。枝ぶり・うねりだけ毎回ランダム。v134で150→180に増量
-  const AMYLOSE_FRAC=0.30;                         // ★アミロース3:アミロペクチン7（≒高アミロース米）。組成も毎回固定（引きでタイムが変わらないよう＝タイムアタック整合）。アミロース＝直鎖で硬く、1擦りで半分しか千切れない（pickCutで半減）。v134で0.20→0.30に増加
+  const GLUCOSE_N=120;                            // ★でんぷんのグルコース節数＝毎回固定（タイムアタックの削る量を一定に）。v135の団子化を受け180→120に減量＝枝の隙間を開けて“枝分かれ”を読ませる
+  const AMYLOSE_FRAC=0.30;                         // ★アミロース3:アミロペクチン7（≒高アミロース米）。組成も毎回固定（引きでタイムが変わらないよう＝タイムアタック整合）。アミロース＝直鎖で硬く、1擦りで半分しか千切れない（pickCutで半減）
+  const DENSITY_K=2.3, NODE_OVL=0.62;             // 密度K（大きいほど間隔L小＝節が詰まる）／節の重なり率（結合先の“親”とはこの率で重なって連結を表現。0.5超で接触）
+  const NODE_SEP=1.5;                             // ★親以外の全ノードから最低この距離(×L)離す＝隣り合う“別の枝”同士に隙間ができ、団子化せず枝分かれが読める（鎖内の連結は親を除外して維持）
+  const AP_BRANCH_LO=0.14, AP_BRANCH_HI=0.12;     // アミロペクチンの枝分かれ確率（lo+rand*hi）＝はっきり分岐
+  const LIN_CURL=0.26;                            // アミロース直鎖のうねり（小さいほど真っ直ぐ＝直鎖に見せる）
   const CIRC=['','①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
   const MAX_LIFE=3;                               // 酵素ライフ。崖(失活)ごとに1つ失い、ゼロでゲームオーバー
   function sugarAt(t){ for(const s of SUGARS) if(t>=s.lo && t<s.hi) return s; return SUGARS[t>=70?3:0]; }
@@ -201,61 +205,70 @@
   const cy=()=>(FIELD_T + (H-FIELD_B))/2;                          // 帯の垂直中央
 
   let latticeD=0;
-  function spawnField(){   // ★デンプンの化学模式図を種から成長。枝分かれ＝アミロペクチン(幹α1-4＋枝α1-6)／直鎖＝アミロース。組成は白米準拠(AMYLOSE_FRAC)で毎回固定＝タイムアタック整合。枝ぶり・うねりだけランダム
+  function spawnField(){   // ★デンプンの化学模式図を種から成長。アミロペクチン=連結した枝分かれ木／アミロース=分岐しない直鎖(複数本)。組成は毎回固定(AMYLOSE_FRAC)＝タイムアタック整合。枝ぶり・うねりだけランダム
     starch=[]; bonds=[]; let id=0;
     const rx=fieldRx();
-    const ry=Math.min((H-FIELD_T-FIELD_B)/2 - 10, rx*1.85);       // ★縦の帯を使う（真円キャップを撤廃）＝上下エリアも生成に使う。プレイ枠が広がった分やや縦長（1.85:1上限）
+    const ry=Math.min((H-FIELD_T-FIELD_B)/2 - 10, rx*1.85);       // ★縦の帯を使う（真円キャップを撤廃）＝上下エリアも生成に使う
     const N=GLUCOSE_N;
-    const L=Math.sqrt(Math.PI*rx*ry/(N*2.0)); latticeD=L;         // 結合長：節数Nでこの縦長楕円を程よく埋める間隔（密度感K=2.0＝サンプルと同等）＝縦にも広がる
-    const s=L*0.60;                                                // 節(六角)の半径＝結合長の6割＝隣とオーバーラップして“みっちり繋がる”（結合線を廃止し密着で連結を表現）
-    const minD2=(L*0.82)*(L*0.82);
+    const L=Math.sqrt(Math.PI*rx*ry/(N*DENSITY_K)); latticeD=L;   // 結合長：節数Nで楕円を密度Kで埋める間隔
+    const s=L*NODE_OVL;                                            // 節(六角)の半径＝親とオーバーラップして連結を表現（結合線なし）
+    const sep2=(L*NODE_SEP)*(L*NODE_SEP);
     const inside=(x,y)=> (x*x)/(rx*rx)+(y*y)/(ry*ry) <= 1;         // 楕円フィールドの内側だけに置く
-    const collide=(x,y)=>{ for(const u of starch){ const dx=u.ox-x, dy=u.oy-y; if(dx*dx+dy*dy<minD2) return true; } return false; };  // 自己回避＝読める樹形
+    // 自己回避：親(exId)は距離L(＝連結でOK)なので除外し、それ以外の全ノードからはNODE_SEP×L以上離す＝別の枝が団子にならず隙間ができる
+    const collide=(x,y,exId)=>{ for(const u of starch){ if(u.id===exId) continue; const dx=u.ox-x, dy=u.oy-y; if(dx*dx+dy*dy<sep2) return true; } return false; };
     const add=(x,y,poly)=>{ starch.push({id, ox:x, oy:y, ox0:x, oy0:y, s, poly, depth:0.9+Math.random()*0.1, ph:Math.random()*6.28,
       face:(Math.random()*3|0), tone:(Math.random()+Math.random()-1), lum:(Math.random()+Math.random()-1),
-      kx:0, ky:0, kvx:0, kvy:0}); return id++; };   // poly='am'(アミロース)/'ap'(アミロペクチン)。ox0/oy0=元位置。ox/oy=現rest（衝撃で恒久ずれ）。kx/ky=ワブルの一時変位
-    function grow(count, poly, branchP, curl){    // 1本の分子を成長。branchP=枝分かれ確率（アミロペクチン>0／アミロース=0で直鎖）、curl=うねり
-      if(count<=0) return; const startIdx=starch.length;
-      let sx=0, sy=0, seeded=false;               // 種：まず楕円内のランダム位置、埋まっていれば既存ノード周辺の空きへ（隙間に生やす）
-      for(let t=0;t<300 && !seeded;t++){
-        if(starch.length && t>=40){ const b=starch[(Math.random()*starch.length)|0], dir=Math.random()*6.28, rr=L*(1.2+Math.random());
-          sx=b.ox+Math.cos(dir)*rr; sy=b.oy+Math.sin(dir)*rr; }
-        else { sx=(Math.random()-0.5)*rx*1.5; sy=(Math.random()-0.5)*ry*1.5; }
-        if(inside(sx,sy)&&!collide(sx,sy)) seeded=true;
-      }
-      if(!seeded) return;                          // 空きが無ければ諦め（下の節数保証ループが埋める）
-      const a0=Math.random()*6.28, seed=add(sx,sy,poly);
-      const tips=[ {x:sx,y:sy,prev:seed,dir:a0,depth:0}, {x:sx,y:sy,prev:seed,dir:a0+Math.PI,depth:0} ];   // 幹は両方向へ
-      let guard=0; const GMAX=count*140;
+      kx:0, ky:0, kvx:0, kvy:0}); return id++; };   // poly='am'(アミロース)/'ap'(アミロペクチン)
+    const freeSeed=()=>{ for(let t=0;t<400;t++){ const x=(Math.random()-0.5)*rx*1.7, y=(Math.random()-0.5)*ry*1.7;
+      if(inside(x,y)&&!collide(x,y,-1)) return [x,y]; } return null; };   // 空きスポットを探す（新しい分子の種＝親なしなので全ノードから離す）
+    // 枝の1歩：既存ノードbから距離Lの隣を探して置く（親bは離隔チェックから除外＝連結、他ノードとはNODE_SEP確保）。必ず隣接＝孤立小島を作らない
+    const step=(b,dir,poly,curl)=>{ for(let tryi=0;tryi<12;tryi++){ const nd=dir+(Math.random()-0.5)*curl*2+(tryi?(Math.random()-0.5)*1.6:0);
+      const nx=b.ox+Math.cos(nd)*L, ny=b.oy+Math.sin(nd)*L;
+      if(inside(nx,ny)&&!collide(nx,ny,b.id)){ const idx=add(nx,ny,poly); bonds.push({a:b.id,b:idx}); return {u:starch[starch.length-1], dir:nd}; } } return null; };
+
+    // === アミロペクチン：1本の“連結した枝分かれ木”をちょうどN_ap個まで。行き止まりは既存ノードから枝を再出芽＝連結を保ちつつ枝を増やす（孤立させない） ===
+    function growBranched(count, poly, branchP, curl){
+      if(count<=0) return; const startIdx=starch.length; const seedPos=freeSeed(); if(!seedPos) return;
+      const a0=Math.random()*6.28, seed=add(seedPos[0],seedPos[1],poly);
+      const tips=[ {b:starch[seed], dir:a0, depth:0}, {b:starch[seed], dir:a0+Math.PI, depth:0} ];   // 幹は両方向へ
+      let guard=0; const GMAX=count*400;
       while(starch.length-startIdx<count && guard++<GMAX){
-        if(tips.length===0){                                      // 全枝が行き止まり→“同じ分子”の既存ノードから再出芽（連結を保つ）
+        if(tips.length===0){                                     // 全枝が行き止まり→まず既存ノードから枝を再出芽（連結維持）。ダメなら空き領域に“別の枝分かれ分子”を新種（＝孤立小島(単発)ではなく、ちゃんとした木。数を必ずNへ）
           let re=false;
-          for(let t=0;t<30;t++){ const bi=startIdx+((Math.random()*(starch.length-startIdx))|0), b=starch[bi], dir=Math.random()*6.28;
-            const nx=b.ox+Math.cos(dir)*L, ny=b.oy+Math.sin(dir)*L;
-            if(inside(nx,ny)&&!collide(nx,ny)){ tips.push({x:b.ox,y:b.oy,prev:b.id,dir,depth:1}); re=true; break; } }
+          for(let t=0;t<150 && !re;t++){ const b=starch[startIdx+((Math.random()*(starch.length-startIdx))|0)], r=step(b,Math.random()*6.28,poly,curl);
+            if(r){ tips.push({b:r.u, dir:r.dir, depth:1}); re=true; } }
+          if(!re){ const sp=freeSeed(); if(sp){ const nid=add(sp[0],sp[1],poly);
+            tips.push({b:starch[nid], dir:Math.random()*6.28, depth:0}); tips.push({b:starch[nid], dir:Math.random()*6.28+Math.PI, depth:0}); re=true; } }
           if(!re) break; continue;
         }
-        const tip=tips[0]; let ok=false, nd, nx, ny;
-        for(let tryi=0; tryi<6; tryi++){ nd=tip.dir+(Math.random()-0.5)*curl*2+(tryi?(Math.random()-0.5)*1.5:0);
-          nx=tip.x+Math.cos(nd)*L; ny=tip.y+Math.sin(nd)*L; if(inside(nx,ny)&&!collide(nx,ny)){ ok=true; break; } }
-        if(!ok){ tips.shift(); continue; }
-        const idx=add(nx,ny,poly); bonds.push({a:tip.prev, b:idx});   // グリコシド結合＝1本の連結した木
-        tip.x=nx; tip.y=ny; tip.prev=idx; tip.dir=nd;
-        if(tip.depth<3 && Math.random()<branchP){ const bd=nd+(Math.random()<0.5?1:-1)*(0.7+Math.random()*0.6);
-          tips.push({x:nx,y:ny,prev:idx,dir:bd,depth:tip.depth+1}); }
+        const tip=tips[0], r=step(tip.b, tip.dir, poly, curl);
+        if(!r){ tips.shift(); continue; }
+        tip.b=r.u; tip.dir=r.dir;
+        if(tip.depth<4 && Math.random()<branchP){ const bd=r.dir+(Math.random()<0.5?1:-1)*(0.8+Math.random()*0.6);   // 枝分かれ＝新しいtipを生やす
+          tips.push({b:r.u, dir:bd, depth:tip.depth+1}); }
       }
     }
-    const N_am=Math.round(N*AMYLOSE_FRAC), N_ap=N-N_am;
-    grow(N_am, 'am', 0.0,  0.16+Math.random()*0.22);                    // ★アミロース＝直鎖(枝なし・低うねり)を“空の盤面に先に”確保＝必ずN_am個置ける（硬い青い鎖）。組成を固定＝タイムアタック整合
-    grow(N_ap, 'ap', 0.05+Math.random()*0.15, 0.30+Math.random()*0.55); // アミロペクチン＝枝分かれで残りを埋める
-    let guard2=0;                                                       // ★節数固定を保証：足りない分は必ず“アミロペクチンとして”追加（アミロースは既に確定30個＝ここで増やさない）。空きスポットを探し最近傍に連結
-    while(starch.length<N && guard2++<N*400){
-      const x=(Math.random()-0.5)*rx*1.98, y=(Math.random()-0.5)*ry*1.98;
-      if(!inside(x,y)||collide(x,y)) continue;
-      let bi=-1,bd2=1e18; for(let k=0;k<starch.length;k++){ const dx=starch[k].ox-x, dy=starch[k].oy-y, d2=dx*dx+dy*dy; if(d2<bd2){bd2=d2;bi=k;} }
-      const idx=add(x,y,'ap'); if(bi>=0) bonds.push({a:starch[bi].id,b:idx});
+    // === アミロース：分岐しない直鎖を複数本。各strandは1つの種から両方向へ真っ直ぐ伸びるだけ（途中から枝を出さない＝直鎖に見せる） ===
+    function growLinear(count, poly){
+      let sguard=0;
+      while(starch.length<count && sguard++<count*30){
+        const seedPos=freeSeed(); if(!seedPos) break;
+        const dir=Math.random()*6.28, seed=add(seedPos[0],seedPos[1],poly);
+        for(const sgn of [0, Math.PI]){                          // 種から両方向へ1本の線として伸ばす
+          let cur=starch[seed], d=dir+sgn, steps=0;
+          while(starch.length<count && steps<70){ const r=step(cur,d,poly,LIN_CURL); if(!r) break; cur=r.u; d=r.dir; steps++; }
+        }
+      }
     }
-    // 集合的な立体感（サンプルのドーム状の“山”）＝分子の重心から遠い節ほど暗く沈める（中心=手前で明るい／縁=奥で暗い）
+    const N_am=Math.round(N*AMYLOSE_FRAC);
+    growLinear(N_am, 'am');                                       // ★アミロース＝直鎖を“空の盤面に先に”N_am個確保（数を保証＝組成固定）
+    growBranched(N - starch.length, 'ap', AP_BRANCH_LO+Math.random()*AP_BRANCH_HI, 0.28+Math.random()*0.30);  // 残りをアミロペクチンの枝分かれ木で
+    let fg=0;                                                     // ★節数保証：足りなければ既存アミロペクチンノードから“隣接して”枝を足す（step経由＝孤立小島を作らない。アミロースは既に確定＝ここでは増やさない）
+    while(starch.length<N && fg++<N*30){
+      const ap=[]; for(const u of starch) if(u.poly==='ap') ap.push(u); if(!ap.length) break;
+      step(ap[(Math.random()*ap.length)|0], Math.random()*6.28, 'ap', 0.5);
+    }
+    // 集合的な立体感（ドーム状の“山”）＝分子の重心から遠い節ほど暗く沈める（中心=手前で明るい／縁=奥で暗い）
     let mcx=0,mcy=0; for(const u of starch){ mcx+=u.ox; mcy+=u.oy; } mcx/=starch.length||1; mcy/=starch.length||1;
     let mmax=1; for(const u of starch){ const d=Math.hypot(u.ox-mcx,u.oy-mcy); if(d>mmax) mmax=d; }
     for(const u of starch){ u.depth=1-0.45*Math.min(1,Math.hypot(u.ox-mcx,u.oy-mcy)/mmax); }
