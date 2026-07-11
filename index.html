@@ -57,7 +57,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v118｜v117ベース】衝撃の乱れを恒久化：突き飛ばし後“元の位置”でなく“ずれた新位置”へ収束＝発火のたびに乱れが累積し分子が壊れていく（乱れっぱなし）。元位置からの最大ドリフトで暴走防止</span>
+    <span class="hint">【v119｜v118ベース】配列の変形を強調：恒久ずれを広く(線形falloff・半径latticeD*9)＋強め(PERM=14+dp*9)＋上限latticeD*3.4に拡大＝発火のたびに配列全体が押されて歪む。表示位置クランプでゲージへのはみ出し防止</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -348,13 +348,13 @@
     // 破壊後の残り
     starch=starch.filter(u=>!cut[u.id]);
     // ★爆発の衝撃波：破壊点(fx,fy)の周囲に残った節を外へ。勢い(ワブル)＋恒久ずれ(乱れっぱなし・累積)＝分子が壊れていく。高分子(dp)ほど強い／元位置からの最大ドリフトMAXDで暴走防止
-    if(!reduce){ const R=latticeD*7, R2=R*R, SHV=140+dp*100, PERM=10+dp*6, MAXD=latticeD*2.2;
+    if(!reduce){ const R=latticeD*9, R2=R*R, SHV=150+dp*100, PERM=14+dp*9, MAXD=latticeD*3.4;
       for(const u of starch){ const dx=u._x-fx, dy=u._y-fy, d2=dx*dx+dy*dy;
-        if(d2>1 && d2<R2){ const d=Math.sqrt(d2), nx=dx/d, ny=dy/d, kk=(1-d/R)*(1-d/R);
-          u.kvx+=nx*SHV*kk; u.kvy+=ny*SHV*kk;                        // 突き飛ばしの勢い（オーバーシュートのワブル）
-          const px0=u.ox, py0=u.oy;                                  // rest位置を外へ恒久移動（ドリフト上限でクランプ）
-          u.ox=Math.max(u.ox0-MAXD,Math.min(u.ox0+MAXD, u.ox+nx*PERM*kk));
-          u.oy=Math.max(u.oy0-MAXD,Math.min(u.oy0+MAXD, u.oy+ny*PERM*kk));
+        if(d2>1 && d2<R2){ const d=Math.sqrt(d2), nx=dx/d, ny=dy/d, k=1-d/R, kk=k*k;
+          u.kvx+=nx*SHV*kk; u.kvy+=ny*SHV*kk;                        // 突き飛ばしの勢い(ワブル)＝近いほど強く集中
+          const px0=u.ox, py0=u.oy;                                  // 恒久ずれ＝rest位置を外へ。線形falloffで“広く”効かせ配列全体が押されて変形（ドリフト上限でクランプ）
+          u.ox=Math.max(u.ox0-MAXD,Math.min(u.ox0+MAXD, u.ox+nx*PERM*k));
+          u.oy=Math.max(u.oy0-MAXD,Math.min(u.oy0+MAXD, u.oy+ny*PERM*k));
           u.kx-=(u.ox-px0); u.ky-=(u.oy-py0); } } }               // 見かけ位置は不変にして、次フレームからバネで“ずれた新rest”へ滑らかに寄る＝乱れが残る
     bonds=bonds.filter(bd=>!(cut[bd.a]||cut[bd.b]));
     pendingCut={};
@@ -584,7 +584,9 @@
         let bx=cx()+u.ox*spr+u.kx, by=cy()+u.oy*spr+u.ky;         // 衝撃変位kx/kyを位置に加算＝配列が波打つ（結合線も追従）
         const cutting=firing&&pendingCut[u.id], jj=jit*(cutting?3.2:1);
         if(cutting){ const g=fp*0.22; bx+=(fireX-bx)*g; by+=(fireY-by)*g; }
-        u._x=bx+Math.sin(u.ph*3)*jj; u._y=by+Math.cos(u.ph*2.3)*jj; }
+        u._x=bx+Math.sin(u.ph*3)*jj; u._y=by+Math.cos(u.ph*2.3)*jj;
+        if(u._x<8)u._x=8; else if(u._x>W-56)u._x=W-56;             // 変形で温度計/端へはみ出さないよう表示位置をクランプ
+        if(u._y<8)u._y=8; else if(u._y>H-8)u._y=H-8; }
       // ★でんぷん鎖の結合＝“玉の下”に描く（ボール＆スティック）＝玉を大きくしても線が顔を横切らない。枝分かれの隙間に覗く。見え方rvb(早め)・張り=heatT
       { const rvb=Math.max(0,Math.min(1,(temp-36)/(54-36))), h=heatT;
         const cr=(214+41*h*0.9)|0, cg=(178-58*h*0.9)|0, cb=(206-136*h*0.9)|0;
