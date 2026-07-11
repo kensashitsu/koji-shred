@@ -57,7 +57,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v115｜v114ベース】分子オブジェクトを見やすく：節を拡大(s=L*0.5＝隣接)＋ドーム陰影コントラスト強化＋目/口を大きく。結合線は玉の下(ボール&スティック)に移し顔を横切らないよう変更</span>
+    <span class="hint">【v116｜v115ベース】質感をサンプル寄りに：v115の硬い輪郭・強コントラストを撤回し、細く柔らかい輪郭＋柔らかパステルグラデに。重心からの“山”陰影で塊の立体感を付与。※密パック特有のキルト状質感は疎な模式図では原理的に別物</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -196,6 +196,10 @@
       if(tip.depth<3 && Math.random()<branchP){ const bd=nd+(Math.random()<0.5?1:-1)*(0.7+Math.random()*0.6);
         tips.push({x:nx,y:ny,prev:idx,dir:bd,depth:tip.depth+1}); }
     }
+    // 集合的な立体感（サンプルのドーム状の“山”）＝分子の重心から遠い節ほど暗く沈める（中心=手前で明るい／縁=奥で暗い）
+    let mcx=0,mcy=0; for(const u of starch){ mcx+=u.ox; mcy+=u.oy; } mcx/=starch.length||1; mcy/=starch.length||1;
+    let mmax=1; for(const u of starch){ const d=Math.hypot(u.ox-mcx,u.oy-mcy); if(d>mmax) mmax=d; }
+    for(const u of starch){ u.depth=1-0.45*Math.min(1,Math.hypot(u.ox-mcx,u.oy-mcy)/mmax); }
     totalStarch=starch.length; for(const u of starch) bakeBody(u);   // 本体スプライトを各節ぶん一度だけ焼く
   }
 
@@ -414,13 +418,12 @@
     const c=document.createElement("canvas"); c.width=size; c.height=size;
     const g=c.getContext("2d"); g.setTransform(DPR,0,0,DPR,0,0); g.translate(R,R);
     g.beginPath(); for(let i=0;i<6;i++){ const a=-Math.PI/2+i*Math.PI/3; g.lineTo(Math.cos(a)*s, Math.sin(a)*s*1.02); } g.closePath();
-    const gr=g.createRadialGradient(-s*.24,-s*.32,0,0,0,s*1.04);       // ドーム状の立体＝明るい頂点→暗いリム（コントラスト強め＝小さくても膨らんで見える）
-    gr.addColorStop(0,toneStop(252,226,244,u.tone,u.lum)); gr.addColorStop(.5,toneStop(234,184,216,u.tone,u.lum));
-    gr.addColorStop(.85,toneStop(204,142,190,u.tone,u.lum)); gr.addColorStop(1,toneStop(168,104,156,u.tone,u.lum));
+    const gr=g.createRadialGradient(-s*.22,-s*.30,0,0,0,s*1.02);       // 柔らかいパステルのドーム（サンプル寄り＝コントラスト控えめ）
+    gr.addColorStop(0,toneStop(247,214,237,u.tone,u.lum)); gr.addColorStop(.6,toneStop(227,175,213,u.tone,u.lum)); gr.addColorStop(1,toneStop(197,139,187,u.tone,u.lum));
     g.fillStyle=gr; g.fill();
-    const shade=(1-u.depth)*0.52; if(shade>0){ g.fillStyle="rgba(24,12,30,"+shade.toFixed(2)+")"; g.fill(); }
-    g.lineWidth=2.2; g.strokeStyle="#7c5175"; g.stroke();              // くっきりした輪郭（熱い時の赤輪郭は本編tintで代替）
-    g.fillStyle="#42283f"; const ex=s*.32, ey=s*.03, er=s*.16;         // 目を大きく＝小さくても顔が明瞭
+    const shade=(1-u.depth)*0.5; if(shade>0){ g.fillStyle="rgba(28,14,34,"+shade.toFixed(2)+")"; g.fill(); }   // 重心からの“山”陰影（縁ほど暗く沈む＝塊の立体）
+    g.lineWidth=1.2; g.strokeStyle="rgba(120,78,112,0.55)"; g.stroke();  // 細く柔らかい輪郭（硬いシール感を避ける）
+    g.fillStyle="#4a2f47"; const ex=s*.32, ey=s*.04, er=s*.15;          // 目（大きめで明瞭・色はやや柔らかく）
     g.beginPath(); g.arc(-ex,-ey,er,0,7); g.arc(ex,-ey,er,0,7); g.fill();
     u.spr=c; u.sprR=R; }
   function drawUnit(x,y,s,rot,face,scared,tint,shade,tone,lum,grad){ tint=tint||0; shade=shade||0; tone=tone||0; lum=lum||0;
