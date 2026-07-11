@@ -1,0 +1,11 @@
+{
+  "name": "アミラーＺ",
+  "short_name": "アミラーＺ",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#211A12",
+  "theme_color": "#211A12",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

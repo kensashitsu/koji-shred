@@ -1,6 +1,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>アミラーＺ — 適温でデンプンを切って糖にする</title>
+<meta name="apple-mobile-web-app-title" content="アミラーＺ">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#211A12">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
 <style>
   :root{ --bg:#211A12; --card:#2A2118; --ink:#F3EADB; --ink2:#B7A88C; --accent:#E0B24A; --green:#7FBE5A; --red:#E4553A; }
   *{box-sizing:border-box} html,body{height:100%}
@@ -57,7 +64,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v123｜v122ベース】タイトルを「アミラーＺ」に／チュートリアル背景では生成アニメを出さず完成分子を静止表示（生成はゲーム開始時のみ）／発火音をアルペジオ→多糖ほど大きく低く長い破裂音に／生成スピードを約2.2秒にゆっくり化</span>
+    <span class="hint">【v124｜v123ベース】チュートリアル背景はデンプン非表示（空の盤面）／破裂音のdp差を強調（音量.41→1.0・爆発レイヤーglu0→dex4発）／生成完了まで擦っても開始不可／ホーム画面アイコン(icon.png)＋manifest＋apple-mobile-web-app-title=アミラーＺ</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -218,26 +225,27 @@
     const lp=a.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=2000+pow*1200;
     s.connect(lp); lp.connect(g); g.connect(a.destination); s.start();
     beep(110,0.2,"sine",.16); setTimeout(()=>beep(70,0.18,"triangle",.12),18); }
-  function sugarBurstSound(dp,e){ if(muted)return; const a=ac(); if(!a)return;   // 発火の破裂音：多糖(dp大)ほど“大きく・低く・長い”爆発（ドンッ→ドバーン）。メロディ無しの純パーカッシブ
-    const now=a.currentTime;
-    // ① ノイズ爆発：dpで長く・こもって・大きく（減衰を緩やかにして尾を伸ばす）
-    const dur=0.15+dp*0.05, buf=a.createBuffer(1,Math.max(1,(a.sampleRate*dur)|0),a.sampleRate), ch=buf.getChannelData(0);
-    for(let i=0;i<ch.length;i++){ ch[i]=(Math.random()*2-1)*Math.pow(1-i/ch.length, 2.0-dp*0.12); }
+  function sugarBurstSound(dp,e){ if(muted)return; const a=ac(); if(!a)return;   // 発火の破裂音：多糖(dp)ほど“大きく・低く・長く・多層”の爆発。単糖=小さいパチッ／デキストリン=特大のドドドバーン。dp差を強く効かせる
+    const now=a.currentTime, D=Math.max(1,dp);
+    // ① メインのノイズ爆発（dpで長さ・音量・低さを大きく変える）
+    const dur=0.12+D*0.09, buf=a.createBuffer(1,Math.max(1,(a.sampleRate*dur)|0),a.sampleRate), ch=buf.getChannelData(0);
+    for(let i=0;i<ch.length;i++){ ch[i]=(Math.random()*2-1)*Math.pow(1-i/ch.length, 2.2-D*0.22); }   // dp大＝尾が長い爆発
     const src=a.createBufferSource(); src.buffer=buf;
-    const lp=a.createBiquadFilter(); lp.type="lowpass"; lp.frequency.setValueAtTime(3200+e*180, now); lp.frequency.exponentialRampToValueAtTime(360, now+dur);
-    const g=a.createGain(); g.gain.value=0.42+dp*0.07;
+    const lp=a.createBiquadFilter(); lp.type="lowpass"; lp.frequency.setValueAtTime(2600+e*160, now); lp.frequency.exponentialRampToValueAtTime(Math.max(180,300-D*22), now+dur);
+    const g=a.createGain(); g.gain.value=0.26+D*0.15;                                                // 音量：glu約.41→dex約1.0
     src.connect(lp); lp.connect(g); g.connect(a.destination); src.start(now);
     // ② 重低音の落下（ドン）：dpで低く・長く・強く
     const o=a.createOscillator(), og=a.createGain(); o.type="sine";
-    o.frequency.setValueAtTime(160+dp*8, now); o.frequency.exponentialRampToValueAtTime(Math.max(28,42-dp*2), now+0.13+dp*0.025);
-    og.gain.setValueAtTime(0.11+dp*0.03, now); og.gain.exponentialRampToValueAtTime(0.0001, now+0.18+dp*0.035);
-    o.connect(og); og.connect(a.destination); o.start(now); o.stop(now+0.26+dp*0.04);
-    // ③ 高分子は二段目の爆発を少し遅らせて重ねる＝ドバーンと派手
-    if(dp>=3){ setTimeout(()=>{ const a2=ac(); if(!a2)return; const t2=a2.currentTime;
-      const b2=a2.createBuffer(1,(a2.sampleRate*0.16)|0,a2.sampleRate), c2=b2.getChannelData(0);
-      for(let i=0;i<c2.length;i++) c2[i]=(Math.random()*2-1)*Math.pow(1-i/c2.length,1.4);
-      const s2=a2.createBufferSource(); s2.buffer=b2; const lp2=a2.createBiquadFilter(); lp2.type="lowpass"; lp2.frequency.value=1200+dp*120;
-      const g2=a2.createGain(); g2.gain.value=0.3+dp*0.04; s2.connect(lp2); lp2.connect(g2); g2.connect(a2.destination); s2.start(t2); }, 45); } }
+    o.frequency.setValueAtTime(170+D*6, now); o.frequency.exponentialRampToValueAtTime(Math.max(22,40-D*3), now+0.10+D*0.03);
+    og.gain.setValueAtTime(0.07+D*0.05, now); og.gain.exponentialRampToValueAtTime(0.0001, now+0.14+D*0.05);
+    o.connect(og); og.connect(a.destination); o.start(now); o.stop(now+0.3+D*0.06);
+    // ③ 追加の爆発レイヤー：dpが大きいほど数が増えて“ドドドバーン”（glu=0/mal=1/mt3=2/dex=4発）
+    const extra=D-1;
+    for(let k=0;k<extra;k++){ setTimeout(()=>{ const a2=ac(); if(!a2)return; const t2=a2.currentTime;
+      const bl=0.09+D*0.02, b2=a2.createBuffer(1,Math.max(1,(a2.sampleRate*bl)|0),a2.sampleRate), c2=b2.getChannelData(0);
+      for(let i=0;i<c2.length;i++) c2[i]=(Math.random()*2-1)*Math.pow(1-i/c2.length,1.6);
+      const s2=a2.createBufferSource(); s2.buffer=b2; const lp2=a2.createBiquadFilter(); lp2.type="lowpass"; lp2.frequency.value=800+k*220;
+      const g2=a2.createGain(); g2.gain.value=0.24; s2.connect(lp2); lp2.connect(g2); g2.connect(a2.destination); s2.start(t2); }, 45+k*52); } }
   function windupSound(){ if(muted)return; const a=ac(); if(!a)return; // 頂点へ張り詰める上昇音
     const o=a.createOscillator(),g=a.createGain(); o.type="sawtooth"; const n=a.currentTime;
     o.frequency.setValueAtTime(320,n); o.frequency.exponentialRampToValueAtTime(1250,n+WINDUP);
@@ -267,7 +275,7 @@
   // ---- 入力：擦る＝往復。折り返した時だけ発熱（＝一方向スワイプは発熱ゼロ）----
   let px=0,py=0,hasP=false, moved=0, rawMove=0, strokeDir=null, strokeLen=0, revCount=0, dbgSpd=0;
   let activeTouch = matchMedia("(pointer:coarse)").matches;   // 現在の入力がタッチか（初期値=粗いポインタ端末。pointerdownで都度確定）
-  function scrub(dx,dy,x,y){ if(!running||denLock>0) return; const d=Math.hypot(dx,dy); if(d<2) return;
+  function scrub(dx,dy,x,y){ if(!running||denLock>0||growT<1) return; const d=Math.hypot(dx,dy); if(d<2) return;   // 生成アニメ中は擦りの火花/音も出さない
     const nx=dx/d, ny=dy/d;
     if(!strokeDir){ strokeDir=[nx,ny]; strokeLen=d; }
     else if(nx*strokeDir[0]+ny*strokeDir[1] < -0.3){   // 進行方向が反転＝1ストローク完成
@@ -486,7 +494,8 @@
     const rdt = hitstop>0 ? 0 : dt; if(hitstop>0) hitstop-=dt;
 
     if(running){
-      const spd=Math.min(rawMove, MOVE_CAP); rawMove=0; moved=0; dbgSpd=spd;   // 擦り量＝指の実移動（往復でも円でもOK）
+      let spd=Math.min(rawMove, MOVE_CAP); rawMove=0; moved=0; dbgSpd=spd;      // 擦り量＝指の実移動（往復でも円でもOK）
+      if(growT<1) spd=0;                                                        // ★デンプン生成完了まで擦っても始まらない（加熱・チャージ・タイマー始動を無効化）
       if(!moveStarted){                                         // ★最初の一擦りまで待機：タイマー0・適温バンド静止（開始直後にいきなり始まらない）
         runStart=now;                                           // 待機中はタイマー原点を今に固定＝経過0のまま
         if(spd>2) moveStarted=true;                             // 初回スクラブで始動
@@ -598,7 +607,7 @@
         gl.addColorStop(0,`rgba(255,240,190,${(.35+fp*.45).toFixed(2)})`); gl.addColorStop(1,"rgba(0,0,0,0)");
         ctx.fillStyle=gl; ctx.fillRect(0,0,W,H); }
     }
-    if(starch.length){
+    if(starch.length && !introField){            // ★チュートリアル(初回start前)ではデンプンを描かない＝空の盤面。はじめる後に生成アニメで現す
       const cN=Math.min(1,charge/SHRED_WORK);   // 擦って“壊す仕事”が溜まるほど全体が震える＝自分で崩している手応え
       const jit=reduce?0:(heatT*heatT*3 + (inGreen?3:0) + cN*cN*5 + dz*dz*8 + fp*7);
       const tint=firing?1:(temp>GREEN[1]?0.9:(inGreen?0.7:heatT*0.7)), scared=heatT>0.5||inGreen||firing;
