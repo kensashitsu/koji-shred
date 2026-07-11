@@ -57,7 +57,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v116｜v115ベース】質感をサンプル寄りに：v115の硬い輪郭・強コントラストを撤回し、細く柔らかい輪郭＋柔らかパステルグラデに。重心からの“山”陰影で塊の立体感を付与。※密パック特有のキルト状質感は疎な模式図では原理的に別物</span>
+    <span class="hint">【v117｜v116ベース】発火の衝撃波を周囲へ伝播：破壊点の近くに残った節を外へ突き飛ばし→位置バネで揺り戻す＝爆発で配列が波打って乱れる。高分子ほど強い。結合線も追従</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -173,7 +173,8 @@
     const inside=(x,y)=> (x*x)/(rx*rx)+(y*y)/(ry*ry) <= 1;         // 楕円フィールドの内側だけに置く
     const collide=(x,y)=>{ for(const u of starch){ const dx=u.ox-x, dy=u.oy-y; if(dx*dx+dy*dy<minD2) return true; } return false; };  // 自己回避＝読める樹形
     const add=(x,y)=>{ starch.push({id, ox:x, oy:y, s, depth:0.9+Math.random()*0.1, ph:Math.random()*6.28,
-      face:(Math.random()*3|0), tone:(Math.random()+Math.random()-1), lum:(Math.random()+Math.random()-1)}); return id++; };
+      face:(Math.random()*3|0), tone:(Math.random()+Math.random()-1), lum:(Math.random()+Math.random()-1),
+      kx:0, ky:0, kvx:0, kvy:0}); return id++; };   // kx/ky=発火の衝撃波で受ける一時変位（バネで0へ戻る）
     const curl=0.30+Math.random()*0.55, branchP=0.05+Math.random()*0.15;   // ★毎回ランダム：うねり・枝分かれ確率
     const sx=(Math.random()-0.5)*rx*0.2, sy=(Math.random()-0.5)*ry*0.2, a0=Math.random()*6.28;
     const seed=add(sx,sy);
@@ -346,6 +347,10 @@
       parts.push({x:fx,y:fy,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-2,life:1.1,sz:2+Math.random()*2.6,col:sug?sug.col:"#9BD26F",spark:true}); }
     // 破壊後の残り
     starch=starch.filter(u=>!cut[u.id]);
+    // ★爆発の衝撃波：破壊点(fx,fy)の周囲に残った節を外へ突き飛ばす（距離で減衰）→位置バネで揺り戻す＝配列に乱れが伝わる。高分子(dp)ほど強い
+    if(!reduce){ const R=latticeD*7, R2=R*R, SH=180+dp*130;
+      for(const u of starch){ const dx=u._x-fx, dy=u._y-fy, d2=dx*dx+dy*dy;
+        if(d2>1 && d2<R2){ const d=Math.sqrt(d2), k=1-d/R, f=SH*k*k/d; u.kvx+=dx*f; u.kvy+=dy*f; } } }
     bonds=bonds.filter(bd=>!(cut[bd.a]||cut[bd.b]));
     pendingCut={};
     // 出来た糖の“分子の数”をストック（壊した玉数nc ÷ 分子サイズdp）→ 糖名ポップ＆チップ加算
@@ -533,14 +538,14 @@
     if(shakeMag>0.2){ shakeMag*=Math.pow(0.001,dt); shakeX=(Math.random()*2-1)*shakeMag; shakeY=(Math.random()*2-1)*shakeMag; } else {shakeX=shakeY=0;}
     if(flash>0) flash-=dt*3;
 
-    render();
+    render(rdt);
     const dbg=document.getElementById("dbg");
     if(dbg) dbg.textContent=`温度 ${temp.toFixed(1)}  ちぎり ${(charge/SHRED_WORK*100).toFixed(0)}%  ${temp>=GREEN[0]&&temp<=GREEN[1]?'適温':(temp>GREEN[1]?'危':'')}`;
     dbgSpd=0;
     requestAnimationFrame(frame);
   }
 
-  function render(){
+  function render(rdt){
     ctx.clearRect(0,0,W,H);
     ctx.save(); ctx.translate(shakeX,shakeY);
 
@@ -565,8 +570,13 @@
       const byId={}; for(const u of starch) byId[u.id]=u;
       // ①各玉の位置を確定。発火中、壊される玉は破壊点(fireX,fireY)へ引き寄せられ激しく震える
       const spr=1+heatT*0.07;                                     // 加熱で分子が押し合って少し広がる＝隠れていた結合線が現れる
+      const KST=200, KDMP=Math.pow(0.0012,rdt), KMAX=latticeD*2.0; // 衝撃波の変位バネ（一度膨らんで数回揺れて戻る）／最大変位クランプ
       for(const u of starch){ u.ph+=firing?0.9:0.3;
-        let bx=cx()+u.ox*spr, by=cy()+u.oy*spr;
+        u.kvx=(u.kvx-u.kx*KST*rdt)*KDMP; u.kvy=(u.kvy-u.ky*KST*rdt)*KDMP;   // バネ：変位を0へ引き戻し＋減衰
+        u.kx+=u.kvx*rdt; u.ky+=u.kvy*rdt;
+        if(u.kx>KMAX)u.kx=KMAX; else if(u.kx<-KMAX)u.kx=-KMAX;
+        if(u.ky>KMAX)u.ky=KMAX; else if(u.ky<-KMAX)u.ky=-KMAX;
+        let bx=cx()+u.ox*spr+u.kx, by=cy()+u.oy*spr+u.ky;         // 衝撃変位kx/kyを位置に加算＝配列が波打つ（結合線も追従）
         const cutting=firing&&pendingCut[u.id], jj=jit*(cutting?3.2:1);
         if(cutting){ const g=fp*0.22; bx+=(fireX-bx)*g; by+=(fireY-by)*g; }
         u._x=bx+Math.sin(u.ph*3)*jj; u._y=by+Math.cos(u.ph*2.3)*jj; }
