@@ -40,6 +40,11 @@
   .hud-prog .bar{flex:1; height:7px; border-radius:4px; background:rgba(255,255,255,.10); overflow:hidden}
   .hud-prog .bar i{display:block; height:100%; width:0%; background:var(--green); border-radius:4px; transition:width .18s linear}
   .hud-prog #progpct{font:700 11px ui-monospace,monospace; color:var(--ink2); min-width:4.8em; text-align:right; font-variant-numeric:tabular-nums}
+  .sourbar{display:flex; align-items:center; gap:8px}
+  .sourbar .lbl{font:800 11px 'Hiragino Kaku Gothic ProN',sans-serif; color:var(--ink2); min-width:2.6em; letter-spacing:.08em}
+  .sbar{position:relative; flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,.08); overflow:hidden}
+  .sbar i{position:absolute; left:0; top:0; bottom:0; width:0%; border-radius:4px; background:#B6C24A; transition:width .2s linear, background .3s}
+  .sbar .tk{position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,.28)}
   .overlay{position:absolute; inset:0; display:grid; place-items:center; background:rgba(20,14,8,.72); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); z-index:5; text-align:center; padding:24px; overflow:auto}
   .overlay[hidden]{display:none}
   .overlay h2{margin:0 0 8px; font-size:24px}
@@ -53,7 +58,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v112｜v111ベース】糖ストック削除／タイム・分解率をプレイ枠外(上部DOM)へ／チュートリアル背景の分子を初回そのままプレイ(introField)／上下マージン圧縮＋楕円1.85:1で分子を縦に拡張</span>
+    <span class="hint">【v113｜v112ベース】酸敗ゲージも上部DOM(横バー)へ移設＝左端の縦レール撤去。FIELD_L 22→18で分子が左スペースも使用。酸敗は緑→橙→赤・満タン近く脈動・1/3,2/3のtick付き</span>
   </header>
   <div class="foot">
     <span>酵素 <span class="life" id="life"></span></span>
@@ -64,6 +69,10 @@
   <div class="hud">
     <div class="hud-time"><b id="timer">0:00.0</b><span id="besttime"></span></div>
     <div class="hud-prog"><div class="bar"><i id="progfill"></i></div><span id="progpct">分解 0%</span></div>
+  </div>
+  <div class="sourbar">
+    <span class="lbl">酸敗</span>
+    <div class="sbar"><i id="sourfill"></i><b class="tk" style="left:33.3%"></b><b class="tk" style="left:66.6%"></b></div>
   </div>
   <div class="stage" id="stage">
     <canvas id="cv"></canvas>
@@ -152,7 +161,7 @@
   let introField=true;   // 初回start()はチュートリアル背景で見えている分子をそのままプレイ（再生成しない＝見えているもの＝プレイするもの）。「もう一度」以降は新規生成
   let prevTemp=START_T, whooshed=false, dangerBeatT=0, pendingCut={};
   // でんぷんの塊は「左＝酸敗ゲージ／右＝温度計／上＝タイマー／下＝進捗バー」に挟まれた帯の“中央”に置く（重なり＆片寄り防止）
-  const FIELD_L=42, FIELD_R=74, FIELD_T=22, FIELD_B=22;           // 各UIを避ける内側マージン（タイム/分解率をDOM＝枠外へ出したので上下を詰め、分子を縦に広げられる）
+  const FIELD_L=18, FIELD_R=74, FIELD_T=22, FIELD_B=22;           // 各UIを避ける内側マージン（タイム/分解率/酸敗ゲージをDOM＝枠外へ出したので上下＋左を詰め、分子を縦横に広げられる。右は温度計が残る）
   const fieldRx=()=>Math.min(W*0.46, (W-FIELD_L-FIELD_R)/2 - 6);
   const fieldRy=()=>Math.min(fieldRx()*1.02, (H-FIELD_T-FIELD_B)/2 - 6);  // ほぼ真円（縦長エッグは不評＝丸をキープ。上下余白は全高レールが枠として受ける）
   const cx=()=>(FIELD_L + (W-FIELD_R))/2;                          // 帯の水平中央（酸敗ゲージと温度計の内側の中点）
@@ -665,7 +674,6 @@
     } ctx.globalAlpha=1; ctx.textBaseline="alphabetic";
 
     drawGauge();
-    drawSourGauge();
     ctx.restore();
     updateHud();
     if(flash>0){ ctx.fillStyle=`rgba(255,255,255,${flash*0.5})`; ctx.fillRect(0,0,W,H); }
@@ -676,32 +684,11 @@
     const frac = totalStarch ? 1-starch.length/totalStarch : 0;
     const pf=document.getElementById("progfill"); if(pf) pf.style.width=(frac*100).toFixed(1)+"%";
     const pp=document.getElementById("progpct"); if(pp) pp.textContent="分解 "+Math.round(frac*100)+"%";
-  }
-
-  function drawSourGauge(){                                      // 酸敗ゲージ（左端の縦バー）：下から溜まる＝酸度がジワジワ上がる感覚。不可逆。満タンでGO。1/3ごとの目安ライン付き
-    if(!running && sour<=0.001) return;
-    const gx=14, gw=13, top=24, bot=H-28, gh=bot-top;             // 温度計と揃えた“全高の左レール”＝左右対称のフレーム
-    round(gx-3, top-3, gw+6, gh+6, 6); ctx.fillStyle="rgba(18,14,7,.55)"; ctx.fill();
-    ctx.strokeStyle="rgba(255,255,255,.14)"; ctx.lineWidth=1; ctx.stroke();
-    const lv=Math.max(0,Math.min(1,sour)), fh=gh*lv, mid=lv>0.33, hi=lv>0.66;
-    // 液（緑→橙→赤へ段階的に・満タン近くで脈動）＋液面ハイライト
-    if(fh>0){ round(gx, bot-fh, gw, fh, 4);
-      const topC= hi?"#E4553A":(mid?"#E0A24A":"#B6C24A"), botC= hi?"#8A2A1B":"#6f7a2f";
-      const g=ctx.createLinearGradient(0,bot-fh,0,bot); g.addColorStop(0,topC); g.addColorStop(1,botC);
-      const pulse= hi ? 0.7+0.3*Math.sin(performance.now()/110) : 1;
-      ctx.fillStyle=g; ctx.globalAlpha=pulse; ctx.fill(); ctx.globalAlpha=1;
-      ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.lineWidth=1.5;
-      ctx.beginPath(); ctx.moveTo(gx+1,bot-fh+0.5); ctx.lineTo(gx+gw-1,bot-fh+0.5); ctx.stroke(); }
-    // 1/3・2/3の目安ライン（“だいたい3回のミス”の目安を視覚化）
-    ctx.strokeStyle="rgba(255,255,255,.22)"; ctx.lineWidth=1;
-    for(let k=1;k<3;k++){ const y=bot-gh*(k/3); ctx.beginPath(); ctx.moveTo(gx,y); ctx.lineTo(gx+gw,y); ctx.stroke(); }
-    // 現在上昇中＝液面の上に向きの矢印
-    if(sourArmed && temp<SOUR_T && running){ const ay=bot-fh; ctx.fillStyle= hi?"#E4553A":"#C7D24E";
-      ctx.beginPath(); ctx.moveTo(gx+gw/2, ay-8); ctx.lineTo(gx+gw/2-5, ay-2); ctx.lineTo(gx+gw/2+5, ay-2); ctx.closePath(); ctx.fill(); }
-    // ラベル
-    ctx.textAlign="center"; ctx.textBaseline="alphabetic";
-    ctx.fillStyle= hi?"#E4553A":"rgba(230,224,200,.78)"; ctx.font="800 11px 'Hiragino Kaku Gothic ProN',sans-serif";
-    ctx.fillText("酸", gx+gw/2, top-13); ctx.fillText("敗", gx+gw/2, top-2);
+    // 酸敗ゲージ＝上部DOMの横バー（左端の縦レールから移設）。緑→橙→赤・満タン近くで脈動。1/3・2/3の目安はCSSのtick
+    const lv=Math.max(0,Math.min(1,sour)), sHi=lv>0.66, sMid=lv>0.33;
+    const sf=document.getElementById("sourfill");
+    if(sf){ sf.style.width=(lv*100).toFixed(1)+"%"; sf.style.background= sHi?"#E4553A":(sMid?"#E0A24A":"#B6C24A");
+      sf.style.opacity = sHi ? (0.7+0.3*Math.sin(performance.now()/110)).toFixed(2) : "1"; }
   }
   function drawGauge(){                                          // 昔ながらの棒状温度計（バルブ＋ガラス管に赤い液柱）＋横に色目盛り
     const tx=W-24, tw=15, top=22, bulbR=16, bulbY=H-24, bot=bulbY-bulbR+6, gh=bot-top;
