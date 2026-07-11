@@ -60,8 +60,7 @@
   .btn{margin-top:18px; border:none; cursor:pointer; font-family:inherit; font-weight:800; font-size:17px; color:#241a08;
     background:var(--accent); padding:14px 32px; border-radius:12px; box-shadow:0 5px 0 #9c7a1e; transition:transform .07s}
   .btn:active{transform:translateY(3px); box-shadow:0 2px 0 #9c7a1e}
-  .titlelogo{display:block; width:min(86%,330px); margin:2px auto 8px; filter:drop-shadow(0 3px 9px rgba(0,0,0,.5))}
-  .overlay h2:empty{display:none}   /* タイトル画面はロゴ画像が見出し＝空のh2は畳む（win/overでtextを入れると表示）*/
+  .overlay .kun{display:block; margin:0 auto 4px; filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
   .btnrow{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
   .btnrow .btn{margin-top:0}
   .btn.ghost{background:transparent; color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset; padding:14px 22px}
@@ -80,7 +79,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v129｜v128ベース】チュートリアル：達成した瞬間にポーズ（次へで再開）＝酸敗の上がる感覚も掴める。タイトルロゴを「アミラーＺ全部をグルコース君の模式図」画像に／ホームアイコンも「Ｚ」を模式図に刷新</span>
+    <span class="hint">【v130｜v129ベース】模式図タイトルロゴ/Ｚアイコンは不評のため撤回＝タイトルは元のグルコース君イラスト＋テキスト、アイコンは元の3体クラスタに戻す。達成でポーズ機能は維持</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -96,8 +95,16 @@
     <div id="dbg" style="position:absolute;top:8px;left:10px;z-index:6;pointer-events:none;font:700 12px ui-monospace,Menlo,Consolas,monospace;color:#8fe3c8;text-shadow:0 1px 2px rgba(0,0,0,.6)"></div>
     <div class="overlay" id="ov">
       <div>
-        <img class="titlelogo" id="titlelogo" src="title-logo.png" alt="アミラーＺ">
-        <h2></h2>
+        <svg class="kun" viewBox="0 0 110 110" width="66" height="66" aria-hidden="true">
+          <defs><radialGradient id="gk" cx="38%" cy="34%" r="66%">
+            <stop offset="0" stop-color="#f9dbee"/><stop offset=".55" stop-color="#eab9d5"/><stop offset=".86" stop-color="#cf90c9"/><stop offset="1" stop-color="#a86ba0"/>
+          </radialGradient></defs>
+          <polygon points="55,9.2 91.4,30.6 91.4,73.4 55,94.8 18.6,73.4 18.6,30.6" fill="url(#gk)" stroke="rgba(120,78,112,.6)" stroke-width="3" stroke-linejoin="round"/>
+          <ellipse cx="34" cy="62" rx="8" ry="6.5" fill="rgba(233,120,150,.35)"/><ellipse cx="76" cy="62" rx="8" ry="6.5" fill="rgba(233,120,150,.35)"/>
+          <circle cx="42" cy="50" r="6" fill="#42283f"/><circle cx="68" cy="50" r="6" fill="#42283f"/>
+          <path d="M44 60 Q55 72 66 60" fill="none" stroke="#42283f" stroke-width="4.5" stroke-linecap="round"/>
+        </svg>
+        <h2>アミラーＺ</h2>
         <p>ゆびで<b>ゴシゴシ往復</b>して温め、<b>適温の帯(緑57〜64℃)</b>で擦るとでんぷんが<b>糖に</b>。全部分解で<b>クリア！</b><br>
         <b>熱すぎ＝失活</b>／<b>冷やしすぎ＝酸敗</b>に注意。<br>
         <span style="font-size:11.5px; color:var(--ink3)">くわしい遊び方は「あそびかた」で体験！</span></p>
@@ -478,7 +485,7 @@
     return '<div style="text-align:left;display:inline-block;max-width:300px"><span style="font-size:11px;color:var(--ink2)">作った糖</span>'+rows+'</div>';
   }
   function showWinOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
-    ov.querySelector("h2").textContent="ゲームクリア！"; const kn=ov.querySelector("#titlelogo"); if(kn) kn.style.display="none";   // 結果画面はタイトルロゴを隠して高さ節約（h2に結果文言）
+    ov.querySelector("h2").textContent="ゲームクリア！"; const kn=ov.querySelector(".kun"); if(kn) kn.style.display="none";   // 結果画面は高さ節約のためグルコース君を隠す
     const timeLine='<span style="font-size:23px">クリアタイム <b style="color:#EAF6D8">'+fmtTime(elapsed)+'</b></span>'+(winIsBest?' <b style="color:#EAD24E">新記録！</b>':(bestTime!=null?'<br><span style="font-size:12px">ベスト '+fmtTime(bestTime)+'</span>':''));
     const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine+'<br>'+sugarBreakdownHTML();
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
@@ -506,7 +513,7 @@
     setTimeout(showOverOverlay, 900); }
   function showOverOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
     const sr=overReason==="sour";
-    ov.querySelector("h2").textContent= sr?"酸敗…":"ゲームオーバー"; const kn=ov.querySelector("#titlelogo"); if(kn) kn.style.display="none";   // 結果画面はタイトルロゴを隠して高さ節約
+    ov.querySelector("h2").textContent= sr?"酸敗…":"ゲームオーバー"; const kn=ov.querySelector(".kun"); if(kn) kn.style.display="none";   // 結果画面は高さ節約
     const frac=totalStarch?Math.round((1-starch.length/totalStarch)*100):0;
     const lead= sr?"低温が続いて酸敗してしまった…":"酵素がすべて失活してしまった…";
     const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=lead+"<br>分解 <b>"+frac+"%</b><br><br>"+sugarBreakdownHTML();
