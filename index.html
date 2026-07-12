@@ -83,7 +83,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v140｜v139ベース】タイムアタックのストップウォッチを小数第2位まで表示(fmtTimeをtoFixed(2)化・初期値0:00.00)。クリアタイム表示も同時に第2位に</span>
+    <span class="hint">【v141｜v140ベース】クリア/GO画面のボタンを「もう一度」＋「やめる」に。やめる=タイトル画面へ復元(TITLE_H2/TITLE_P控え→showTitle)。btnrowにid=quit(初期hidden)追加、結果画面でtut隠しquit表示</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -112,7 +112,7 @@
         <p>ゆびで<b>ゴシゴシ往復</b>して温め、<b>適温の帯(緑57〜64℃)</b>で擦るとでんぷんが<b>糖に</b>。全部分解で<b>クリア！</b><br>
         <b>熱すぎ＝失活</b>／<b>冷やしすぎ＝酸敗</b>に注意。<br>
         <span style="font-size:11.5px; color:var(--ink3)">くわしい遊び方は「あそびかた」で体験！</span></p>
-        <div class="btnrow"><button class="btn" id="start">はじめる</button><button class="btn ghost" id="tut">あそびかた</button></div>
+        <div class="btnrow"><button class="btn" id="start">はじめる</button><button class="btn ghost" id="tut">あそびかた</button><button class="btn ghost" id="quit" hidden>やめる</button></div>
       </div>
     </div>
     <div class="coach" id="coach" hidden><span id="coachtxt"></span><button class="coachbtn" id="coachnext">次へ</button></div>
@@ -388,6 +388,17 @@
   stage.addEventListener("pointerleave", endPointer);
   stage.addEventListener("touchmove", e=>{ if(running) e.preventDefault(); }, {passive:false});  // ゴシゴシ中のスクロール/ラバーバンドを抑止
   document.getElementById("start").addEventListener("click", ()=>{ const a=ac(); if(a&&a.state==="suspended"){ try{ a.resume(); }catch(_){} } start(); });
+  const TITLE_H2=document.querySelector("#ov h2").textContent, TITLE_P=document.querySelector("#ov p").innerHTML;  // タイトル画面の見出し・説明文を控える＝「やめる」で復元
+  function showTitle(){ const ov=document.getElementById("ov"); if(!ov) return;   // クリア/GO画面の「やめる」→タイトル画面へ復元
+    running=false; firing=false;
+    ov.querySelector("h2").textContent=TITLE_H2;
+    const kn=ov.querySelector(".kun"); if(kn) kn.style.display="";
+    const ps=ov.querySelectorAll("p"); if(ps[0]){ ps[0].innerHTML=TITLE_P; }
+    for(let i=0;i<ps.length;i++) ps[i].style.display="";
+    document.getElementById("start").textContent="はじめる";
+    document.getElementById("tut").hidden=false; document.getElementById("quit").hidden=true;
+    ov.hidden=false; }
+  document.getElementById("quit").addEventListener("click", showTitle);
   // ---- 操作説明チュートリアル（プレイ画面上でコーチ吹き出し／失活・酸敗しても続行＝安全に練習）----
   // 段階的チュートリアル：各ステップは「指示text」と「達成条件goal」を持つ。goalを満たすと『次へ』が解禁＝内容に沿って順番に体験。firing(糖に切る)はstep②から解禁＝徐々に操作解除
   const TUT=[
@@ -580,7 +591,9 @@
     const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine   // 作った糖＋ベスト5を一緒に表示（タブ切替はv138で試みたがユーザー指示で撤回）
       +'<div style="display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:6px">'+sugarBreakdownHTML()+rankingHTML()+'</div>';
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
-    document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
+    document.getElementById("start").textContent="もう一度";
+    document.getElementById("tut").hidden=true; document.getElementById("quit").hidden=false;   // 結果画面は「もう一度」「やめる(→タイトル)」
+    ov.hidden=false; }
   function denature(){ if(tutMode) tutDenat++;                     // チュートリアル：失活を体験した回数（③のgoal判定）
     denLock=0.5; temp=DENATURE_KNOCK; heatE=0; charge=0; combo=0; firing=false; pendingSugar=null; pendingCut={};  // ★温度は55℃まで押し戻す（全リセットはしない）＝少し登り直す程度でゲーム続行。硬直中は温度固定
     enzymeLife=Math.max(tutMode?1:0, enzymeLife-1); refreshLife();   // 失活で酵素を1つ失う。★チュートリアルでも1つ減らして見せる（ただし最低1つ残す＝ゲームオーバーしない）
@@ -609,7 +622,9 @@
     const lead= sr?"低温が続いて酸敗してしまった…":"酵素がすべて失活してしまった…";
     const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=lead+"<br>分解 <b>"+frac+"%</b><br><br>"+sugarBreakdownHTML();
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
-    document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
+    document.getElementById("start").textContent="もう一度";
+    document.getElementById("tut").hidden=true; document.getElementById("quit").hidden=false;   // 結果画面は「もう一度」「やめる(→タイトル)」
+    ov.hidden=false; }
 
   // ---- 六角形グルコース君 ----
   function hexPath(x,y,s,rot){ ctx.save(); ctx.translate(x,y); ctx.rotate(rot||0); ctx.beginPath();
