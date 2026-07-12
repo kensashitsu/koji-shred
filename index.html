@@ -65,12 +65,6 @@
   .btnrow .btn{margin-top:0}
   .btn.ghost{background:transparent; color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset; padding:14px 22px}
   .btn.ghost:active{transform:translateY(2px); box-shadow:0 0 0 2px var(--accent) inset}
-  /* 結果画面：作った糖／ランキングをタブで切替（情報量を分割） */
-  .rtabs{display:flex; gap:8px; justify-content:center; margin-top:12px}
-  .rtab{cursor:pointer; border:none; font-family:inherit; font-weight:800; font-size:12.5px; color:var(--ink2);
-    background:rgba(255,255,255,.06); padding:8px 16px; border-radius:999px; box-shadow:inset 0 0 0 1px rgba(255,255,255,.09); transition:background .12s,color .12s}
-  .rtab.on{color:#241a08; background:var(--accent); box-shadow:none}
-  #resultbody{margin-top:10px; min-height:120px; display:flex; justify-content:center}
   .coach{position:absolute; left:12px; right:12px; bottom:12px; z-index:7; display:flex; align-items:center; gap:10px;
     background:rgba(20,14,8,.94); border:1px solid var(--accent); border-radius:14px; padding:12px 13px; box-shadow:0 8px 24px rgba(0,0,0,.5)}
   .coach[hidden]{display:none}
@@ -89,7 +83,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v138｜v137ベース】クリア画面の情報量を分割：「作った糖／🏆ランキング」をタブで切替（初期=作った糖、タップでベスト5へ）。rtabs/rtab CSS＋showWinOverlayでsetTab</span>
+    <span class="hint">【v139｜v137ベース】タブ切替方式(v138)をユーザー指示で撤回＝クリア画面は「作った糖」＋「🏆ベスト5」を一緒に表示する形(v137)に戻した。rtabs/rtab CSSとsetTabは削除</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -583,14 +577,9 @@
   function showWinOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
     ov.querySelector("h2").textContent="ゲームクリア！"; const kn=ov.querySelector(".kun"); if(kn) kn.style.display="none";   // 結果画面は高さ節約のためグルコース君を隠す
     const timeLine='<span style="font-size:23px">クリアタイム <b style="color:#EAF6D8">'+fmtTime(elapsed)+'</b></span>'+(winIsBest?' <b style="color:#EAD24E">新記録！</b>':(winRank?' <b style="color:#EAD24E">'+winRank+'位！</b>':''));
-    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine   // タブで「作った糖／ランキング」を切替＝一度に出す情報量を減らす
-      +'<div class="rtabs"><button class="rtab" id="tab-sugar">作った糖</button><button class="rtab" id="tab-rank">🏆 ランキング</button></div><div id="resultbody"></div>';
+    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine   // 作った糖＋ベスト5を一緒に表示（タブ切替はv138で試みたがユーザー指示で撤回）
+      +'<div style="display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:6px">'+sugarBreakdownHTML()+rankingHTML()+'</div>';
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
-    const body=document.getElementById("resultbody"), ts=document.getElementById("tab-sugar"), tr=document.getElementById("tab-rank");
-    const setTab=(w)=>{ if(ts)ts.classList.toggle("on",w==='sugar'); if(tr)tr.classList.toggle("on",w==='rank');
-      if(body) body.innerHTML = w==='rank' ? rankingHTML() : sugarBreakdownHTML(); };
-    if(ts) ts.onclick=()=>setTab('sugar'); if(tr) tr.onclick=()=>setTab('rank');
-    setTab('sugar');                                                 // 初期は「作った糖」。タップでランキングへ
     document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
   function denature(){ if(tutMode) tutDenat++;                     // チュートリアル：失活を体験した回数（③のgoal判定）
     denLock=0.5; temp=DENATURE_KNOCK; heatE=0; charge=0; combo=0; firing=false; pendingSugar=null; pendingCut={};  // ★温度は55℃まで押し戻す（全リセットはしない）＝少し登り直す程度でゲーム続行。硬直中は温度固定
