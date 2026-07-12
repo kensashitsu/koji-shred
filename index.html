@@ -83,7 +83,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v136｜v135ベース】生成ロジック刷新：アミロース=分岐しない直鎖(複数本)／アミロペクチン=連結した枝分かれ木に分離。自己回避を「親は距離L(連結)・他ノードはNODE_SEP離す」に変更＝別の枝が団子化せず隙間ができ枝分かれが読める。孤立小島を作らない(新種は木単位)。総量180→120に減量。組成120/am36/ap84で固定</span>
+    <span class="hint">【v137｜v136ベース】①孤立小島を根絶(種は必ず1歩伸びる場所=spreadSeedのみ・50連続で単発島0)②玉サイズをSIZE_REFで固定し数だけ増量(120→135)＝空き余白を均等に充填(spreadSeed=最も空いた所へ)③クリア画面にタイムアタック ベスト5ランキング表示(kojiShredTop5)。組成135/am41/ap94で固定</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
@@ -142,7 +142,8 @@
     {key:"dex", name:"デキストリン",     jname:"",         desc:"ブドウ糖が多数連なった多糖。とろみのもと。",     lo:66.5, hi:73,   col:"#E4883C", dp:5},
   ];
   const MOL_PER_FIRE=4;                           // 1発火で作る“分子の数”。ちぎれる玉数＝dp×これ（分子が大きいほど沢山ちぎれる）
-  const GLUCOSE_N=120;                            // ★でんぷんのグルコース節数＝毎回固定（タイムアタックの削る量を一定に）。v135の団子化を受け180→120に減量＝枝の隙間を開けて“枝分かれ”を読ませる
+  const GLUCOSE_N=135;                            // ★でんぷんのグルコース節数＝毎回固定（タイムアタックの削る量を一定に）。v136の120→135に増量（空き余白を埋める。実測の最悪充填137より下＝毎回確実にちょうど置ける）。玉サイズはSIZE_REFで固定なので大きさは不変
+  const SIZE_REF=120;                             // ★玉の“表示サイズ”基準：間隔L=√(πrxry/(SIZE_REF·K))で決め、実際の節数Nと分離＝Nを増やしても玉は同じ大きさのまま（埋まる量だけ増える）
   const AMYLOSE_FRAC=0.30;                         // ★アミロース3:アミロペクチン7（≒高アミロース米）。組成も毎回固定（引きでタイムが変わらないよう＝タイムアタック整合）。アミロース＝直鎖で硬く、1擦りで半分しか千切れない（pickCutで半減）
   const DENSITY_K=2.3, NODE_OVL=0.62;             // 密度K（大きいほど間隔L小＝節が詰まる）／節の重なり率（結合先の“親”とはこの率で重なって連結を表現。0.5超で接触）
   const NODE_SEP=1.5;                             // ★親以外の全ノードから最低この距離(×L)離す＝隣り合う“別の枝”同士に隙間ができ、団子化せず枝分かれが読める（鎖内の連結は親を除外して維持）
@@ -188,7 +189,10 @@
   let sour=0, sourArmed=false, overReason="enzyme";               // 酸敗ゲージ(0..1・不可逆)／作動フラグ(57℃到達で真)／敗因
   let sourSndT=0;                                                 // 酸敗中サウンドの再生間隔タイマー
   let tutMode=false, tutStep=0, tutGoalMet=false, tutFires=0, tutDenat=0, tutPaused=false, tutLast="";   // 操作説明チュートリアル（すべてtutModeガード＝本番に影響なし）。tutPaused=達成の瞬間ポーズ／tutLast=最後に切った糖key（糖ごとデモのgoal判定）
-  try{ const b=localStorage.getItem('kojiShredBest'); if(b) bestTime=parseFloat(b); }catch(e){}
+  let topTimes=[];                                                 // タイムアタック上位5件（昇順・localStorage保存）
+  try{ const t=localStorage.getItem('kojiShredTop5'); if(t) topTimes=(JSON.parse(t)||[]).filter(x=>typeof x==='number'); }catch(e){}
+  try{ const b=localStorage.getItem('kojiShredBest'); if(b){ const bv=parseFloat(b); if(!topTimes.length) topTimes=[bv]; } }catch(e){}  // 旧ベスト値をランキングへ引き継ぎ
+  if(topTimes.length) bestTime=topTimes[0];
   (function(){ const d=document.getElementById("dbg"); if(d) d.style.display="none"; })();   // デバッグ表示は隠す（スコアHUDを出すため）
   function fmtTime(s){ s=Math.max(0,s); const m=Math.floor(s/60), sec=s-m*60; return m+":"+(sec<10?"0":"")+sec.toFixed(1); }
   let firing=false, fireT=0, curN=STARCH_N;
@@ -206,68 +210,81 @@
 
   let latticeD=0;
   function spawnField(){   // ★デンプンの化学模式図を種から成長。アミロペクチン=連結した枝分かれ木／アミロース=分岐しない直鎖(複数本)。組成は毎回固定(AMYLOSE_FRAC)＝タイムアタック整合。枝ぶり・うねりだけランダム
-    starch=[]; bonds=[]; let id=0;
+    starch=[]; bonds=[];
     const rx=fieldRx();
     const ry=Math.min((H-FIELD_T-FIELD_B)/2 - 10, rx*1.85);       // ★縦の帯を使う（真円キャップを撤廃）＝上下エリアも生成に使う
     const N=GLUCOSE_N;
-    const L=Math.sqrt(Math.PI*rx*ry/(N*DENSITY_K)); latticeD=L;   // 結合長：節数Nで楕円を密度Kで埋める間隔
+    const L=Math.sqrt(Math.PI*rx*ry/(SIZE_REF*DENSITY_K)); latticeD=L;   // ★間隔L=玉サイズは固定基準SIZE_REFで決める＝節数Nを増やしても玉の大きさは不変（Nは“埋まる量”を変えるだけ）
     const s=L*NODE_OVL;                                            // 節(六角)の半径＝親とオーバーラップして連結を表現（結合線なし）
     const sep2=(L*NODE_SEP)*(L*NODE_SEP);
     const inside=(x,y)=> (x*x)/(rx*rx)+(y*y)/(ry*ry) <= 1;         // 楕円フィールドの内側だけに置く
     // 自己回避：親(exId)は距離L(＝連結でOK)なので除外し、それ以外の全ノードからはNODE_SEP×L以上離す＝別の枝が団子にならず隙間ができる
     const collide=(x,y,exId)=>{ for(const u of starch){ if(u.id===exId) continue; const dx=u.ox-x, dy=u.oy-y; if(dx*dx+dy*dy<sep2) return true; } return false; };
-    const add=(x,y,poly)=>{ starch.push({id, ox:x, oy:y, ox0:x, oy0:y, s, poly, depth:0.9+Math.random()*0.1, ph:Math.random()*6.28,
+    const add=(x,y,poly)=>{ const nid=starch.length; starch.push({id:nid, ox:x, oy:y, ox0:x, oy0:y, s, poly, depth:0.9+Math.random()*0.1, ph:Math.random()*6.28,
       face:(Math.random()*3|0), tone:(Math.random()+Math.random()-1), lum:(Math.random()+Math.random()-1),
-      kx:0, ky:0, kvx:0, kvy:0}); return id++; };   // poly='am'(アミロース)/'ap'(アミロペクチン)
-    const freeSeed=()=>{ for(let t=0;t<400;t++){ const x=(Math.random()-0.5)*rx*1.7, y=(Math.random()-0.5)*ry*1.7;
-      if(inside(x,y)&&!collide(x,y,-1)) return [x,y]; } return null; };   // 空きスポットを探す（新しい分子の種＝親なしなので全ノードから離す）
-    // 枝の1歩：既存ノードbから距離Lの隣を探して置く（親bは離隔チェックから除外＝連結、他ノードとはNODE_SEP確保）。必ず隣接＝孤立小島を作らない
-    const step=(b,dir,poly,curl)=>{ for(let tryi=0;tryi<12;tryi++){ const nd=dir+(Math.random()-0.5)*curl*2+(tryi?(Math.random()-0.5)*1.6:0);
+      kx:0, ky:0, kvx:0, kvy:0}); return nid; };   // id=配列インデックス（popで巻き戻し安全）。poly='am'/'ap'
+    // 既存ノードbから距離Lの空き隣へ1歩置く（親bは離隔チェック除外＝連結、他ノードとはNODE_SEP確保）。dir方向±curlで探す
+    const stepDir=(b,dir,poly,curl)=>{ for(let tryi=0;tryi<12;tryi++){ const nd=dir+(Math.random()-0.5)*curl*2+(tryi?(Math.random()-0.5)*1.6:0);
       const nx=b.ox+Math.cos(nd)*L, ny=b.oy+Math.sin(nd)*L;
-      if(inside(nx,ny)&&!collide(nx,ny,b.id)){ const idx=add(nx,ny,poly); bonds.push({a:b.id,b:idx}); return {u:starch[starch.length-1], dir:nd}; } } return null; };
+      if(inside(nx,ny)&&!collide(nx,ny,b.id)){ bonds.push({a:b.id,b:starch.length}); return {u:starch[add(nx,ny,poly)], dir:nd}; } } return null; };
+    const stepAny=(b,poly)=>{ const off=Math.random()*6.283; for(let a=0;a<16;a++){ const nd=off+a/16*6.283;   // 全方位から最初の空き隣（種の1本目用）
+      const nx=b.ox+Math.cos(nd)*L, ny=b.oy+Math.sin(nd)*L;
+      if(inside(nx,ny)&&!collide(nx,ny,b.id)){ bonds.push({a:b.id,b:starch.length}); return {u:starch[add(nx,ny,poly)], dir:nd}; } } return null; };
+    const stepReach=(b,poly)=>{ for(const mul of [1.0,1.15,1.3]){ const off=Math.random()*6.283; for(let a=0;a<16;a++){ const nd=off+a/16*6.283;   // 端数を詰めるための“少し長めのボンド”フォールバック＝狭い隙間に1個押し込む（1.3Lでもほぼ接触＝連結に見える）
+      const nx=b.ox+Math.cos(nd)*L*mul, ny=b.oy+Math.sin(nd)*L*mul;
+      if(inside(nx,ny)&&!collide(nx,ny,b.id)){ bonds.push({a:b.id,b:starch.length}); return starch[add(nx,ny,poly)]; } } } return null; };
+    const canGrow=(x,y)=>{ for(let a=0;a<12;a++){ const nd=a/12*6.283; const nx=x+Math.cos(nd)*L, ny=y+Math.sin(nd)*L;
+      if(inside(nx,ny)&&!collide(nx,ny,-1)) return true; } return false; };
+    const nearest2=(x,y)=>{ let m=1e18; for(const u of starch){ const dx=u.ox-x, dy=u.oy-y, d=dx*dx+dy*dy; if(d<m)m=d; } return m; };
+    // 新しい分子の種：空き＋最低1歩伸ばせる場所の中から“最も空いている(既存から遠い)”所を選ぶ＝全体へ均等に広がり余白を埋める。孤立(1歩も伸びない種)は選ばない
+    const spreadSeed=()=>{ let best=null, bs=-1; for(let t=0;t<70;t++){ const x=(Math.random()-0.5)*rx*1.95, y=(Math.random()-0.5)*ry*1.95;
+      if(!inside(x,y)||collide(x,y,-1)||!canGrow(x,y)) continue; const d=starch.length?nearest2(x,y):1e18; if(d>bs){ bs=d; best=[x,y]; } } return best; };
+    // 種＋最初の1歩を一気に作る＝“種だけ置いて伸びず孤立”を防ぐ。両端tip（進む向き＋反対向き）を返す
+    const newTree=(poly)=>{ const sp=spreadSeed(); if(!sp) return null; const seed=add(sp[0],sp[1],poly);
+      const r=stepAny(starch[seed],poly); if(!r){ starch.pop(); return null; }
+      return [ {b:r.u, dir:r.dir, depth:1}, {b:starch[seed], dir:r.dir+Math.PI, depth:0} ]; };
 
-    // === アミロペクチン：1本の“連結した枝分かれ木”をちょうどN_ap個まで。行き止まりは既存ノードから枝を再出芽＝連結を保ちつつ枝を増やす（孤立させない） ===
+    // === アミロペクチン：連結した枝分かれ木。行き止まりは既存ノードから枝を再出芽（連結維持）、無理なら“最も空いた場所へ別の枝分かれ木”を新種（木単位＝単発の孤立小島は作らない） ===
     function growBranched(count, poly, branchP, curl){
-      if(count<=0) return; const startIdx=starch.length; const seedPos=freeSeed(); if(!seedPos) return;
-      const a0=Math.random()*6.28, seed=add(seedPos[0],seedPos[1],poly);
-      const tips=[ {b:starch[seed], dir:a0, depth:0}, {b:starch[seed], dir:a0+Math.PI, depth:0} ];   // 幹は両方向へ
-      let guard=0; const GMAX=count*400;
+      if(count<=0) return; const startIdx=starch.length; let tips=newTree(poly); if(!tips) return;
+      let guard=0; const GMAX=count*500;
       while(starch.length-startIdx<count && guard++<GMAX){
-        if(tips.length===0){                                     // 全枝が行き止まり→まず既存ノードから枝を再出芽（連結維持）。ダメなら空き領域に“別の枝分かれ分子”を新種（＝孤立小島(単発)ではなく、ちゃんとした木。数を必ずNへ）
+        if(tips.length===0){
           let re=false;
-          for(let t=0;t<150 && !re;t++){ const b=starch[startIdx+((Math.random()*(starch.length-startIdx))|0)], r=step(b,Math.random()*6.28,poly,curl);
+          for(let t=0;t<60 && !re;t++){ const b=starch[startIdx+((Math.random()*(starch.length-startIdx))|0)], r=stepDir(b,Math.random()*6.283,poly,curl);
             if(r){ tips.push({b:r.u, dir:r.dir, depth:1}); re=true; } }
-          if(!re){ const sp=freeSeed(); if(sp){ const nid=add(sp[0],sp[1],poly);
-            tips.push({b:starch[nid], dir:Math.random()*6.28, depth:0}); tips.push({b:starch[nid], dir:Math.random()*6.28+Math.PI, depth:0}); re=true; } }
+          if(!re && starch.length<=N-2){ const nt=newTree(poly); if(nt){ tips=nt; re=true; } }   // 別の木を最も空いた場所へ（種＋1歩＝孤立しない）。残り1枠のときはnewTree(2個)禁止＝超過防止（端数はtopUpが埋める）
           if(!re) break; continue;
         }
-        const tip=tips[0], r=step(tip.b, tip.dir, poly, curl);
+        const tip=tips[0], r=stepDir(tip.b, tip.dir, poly, curl);
         if(!r){ tips.shift(); continue; }
         tip.b=r.u; tip.dir=r.dir;
-        if(tip.depth<4 && Math.random()<branchP){ const bd=r.dir+(Math.random()<0.5?1:-1)*(0.8+Math.random()*0.6);   // 枝分かれ＝新しいtipを生やす
+        if(tip.depth<4 && Math.random()<branchP){ const bd=r.dir+(Math.random()<0.5?1:-1)*(0.8+Math.random()*0.6);   // 枝分かれ＝新しいtip
           tips.push({b:r.u, dir:bd, depth:tip.depth+1}); }
       }
     }
-    // === アミロース：分岐しない直鎖を複数本。各strandは1つの種から両方向へ真っ直ぐ伸びるだけ（途中から枝を出さない＝直鎖に見せる） ===
+    // === アミロース：分岐しない直鎖を複数本。各strandは種から両方向へ真っ直ぐ伸びるだけ（途中から枝を出さない） ===
     function growLinear(count, poly){
       let sguard=0;
-      while(starch.length<count && sguard++<count*30){
-        const seedPos=freeSeed(); if(!seedPos) break;
-        const dir=Math.random()*6.28, seed=add(seedPos[0],seedPos[1],poly);
-        for(const sgn of [0, Math.PI]){                          // 種から両方向へ1本の線として伸ばす
-          let cur=starch[seed], d=dir+sgn, steps=0;
-          while(starch.length<count && steps<70){ const r=step(cur,d,poly,LIN_CURL); if(!r) break; cur=r.u; d=r.dir; steps++; }
-        }
+      while(starch.length<=count-2 && sguard++<count*30){         // newTreeは2個組で足すのでcount-2まで（超過防止）。端数はtopUpで
+        const tips=newTree(poly); if(!tips) break;               // 種＋1歩（＝孤立しない）。両端tipから真っ直ぐ伸ばす
+        for(const tp of tips){ let cur=tp.b, d=tp.dir, steps=0;
+          while(starch.length<count && steps<80){ const r=stepDir(cur,d,poly,LIN_CURL); if(!r) break; cur=r.u; d=r.dir; steps++; } }
       }
     }
+    // 端数を“既存の同poly鎖から隣接して1個ずつ”足して丁度targetへ（stepDir＝孤立小島を作らない）。既存frontierが完全に詰まって置けない時だけ、残り≥2なら別の小さな連結分子(newTree=種＋1歩)で埋める＝単発の孤立小島は作らずNをちょうどに
+    function topUp(poly, target, curl){ let g=0, stall=0;
+      while(starch.length<target && g++<target*60){
+        const arr=[]; for(const u of starch) if(u.poly===poly) arr.push(u); if(!arr.length) break;
+        if(stepDir(arr[(Math.random()*arr.length)|0], Math.random()*6.283, poly, curl)){ stall=0; continue; }
+        if(++stall>arr.length){                                   // frontierが詰まった：残り≥2なら別の小連結分子、残り1(等)なら少し長めのボンドで隙間に押し込む＝丁度targetに
+          if(target-starch.length>=2 && newTree(poly)){ stall=0; continue; }
+          let done=false; for(const u of arr){ if(stepReach(u,poly)){ done=true; break; } }
+          if(done) stall=0; else break; } } }
     const N_am=Math.round(N*AMYLOSE_FRAC);
-    growLinear(N_am, 'am');                                       // ★アミロース＝直鎖を“空の盤面に先に”N_am個確保（数を保証＝組成固定）
+    growLinear(N_am, 'am'); topUp('am', N_am, LIN_CURL);          // ★アミロース＝直鎖を先に丁度N_am個確保（数を保証＝組成固定。端数は鎖端から低curlで＝直鎖維持）
     growBranched(N - starch.length, 'ap', AP_BRANCH_LO+Math.random()*AP_BRANCH_HI, 0.28+Math.random()*0.30);  // 残りをアミロペクチンの枝分かれ木で
-    let fg=0;                                                     // ★節数保証：足りなければ既存アミロペクチンノードから“隣接して”枝を足す（step経由＝孤立小島を作らない。アミロースは既に確定＝ここでは増やさない）
-    while(starch.length<N && fg++<N*30){
-      const ap=[]; for(const u of starch) if(u.poly==='ap') ap.push(u); if(!ap.length) break;
-      step(ap[(Math.random()*ap.length)|0], Math.random()*6.28, 'ap', 0.5);
-    }
+    topUp('ap', N, 0.6);                                          // ★節数保証：丁度N個に（アミロースは確定済＝apだけ足す）
     // 集合的な立体感（ドーム状の“山”）＝分子の重心から遠い節ほど暗く沈める（中心=手前で明るい／縁=奥で暗い）
     let mcx=0,mcy=0; for(const u of starch){ mcx+=u.ox; mcy+=u.oy; } mcx/=starch.length||1; mcy/=starch.length||1;
     let mmax=1; for(const u of starch){ const d=Math.hypot(u.ox-mcx,u.oy-mcy); if(d>mmax) mmax=d; }
@@ -525,9 +542,14 @@
     heatE=0; firing=false; temp+=FIRE_HEAT;               // 発火ごとに発熱＝連発するほど崖に近づく（駆け引き）。温度は維持＝居座り連鎖
     if(starch.length===0) win();                          // 画面のでんぷんを全部壊した＝ゲームクリア
   }
+  let winRank=0;                                                  // 今回のクリアがランキング何位に入ったか（0=圏外）
   function win(){ running=false; firing=false; charge=0;
-    winIsBest = (bestTime==null || elapsed<bestTime);            // タイムアタック：新記録判定＆保存
-    if(winIsBest){ bestTime=elapsed; try{ localStorage.setItem('kojiShredBest', bestTime.toFixed(2)); }catch(e){} }
+    winIsBest = (bestTime==null || elapsed<bestTime);            // タイムアタック：新記録判定
+    topTimes.push(elapsed); topTimes.sort((a,b)=>a-b);           // 上位5件を更新・保存
+    winRank = topTimes.indexOf(elapsed)+1;                        // 今回の順位（同着は上側）＝この行はslice前に取る
+    topTimes=topTimes.slice(0,5); if(winRank>5) winRank=0;        // 5位以内に入らなければ圏外
+    bestTime=topTimes[0];
+    try{ localStorage.setItem('kojiShredTop5', JSON.stringify(topTimes.map(t=>+t.toFixed(2)))); localStorage.setItem('kojiShredBest', bestTime.toFixed(2)); }catch(e){}
     fireX=cx(); fireY=cy(); bloom=1; flash=.85; shakeMag=22;
     for(let i=0;i<3;i++) rings.push({x:cx(),y:cy(),r:20,vr:460+i*140,w:11,life:1});
     for(let i=0;i<90;i++){ const a=Math.random()*6.28, sp=3+Math.random()*11;
@@ -545,10 +567,18 @@
     }).join('');
     return '<div style="text-align:left;display:inline-block;max-width:300px"><span style="font-size:11px;color:var(--ink2)">作った糖</span>'+rows+'</div>';
   }
+  function rankingHTML(){                                          // タイムアタック上位5位（今回のクリアは金色で強調）
+    if(!topTimes.length) return '';
+    const rows=topTimes.map((t,i)=>{ const me=(winRank===i+1);
+      return '<div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;line-height:1.55;'+(me?'color:#EAD24E;font-weight:800':'color:var(--ink2)')+'">'
+        +'<span>'+(i+1)+'位</span><span style="font-variant-numeric:tabular-nums">'+fmtTime(t)+(me?' ◀今回':'')+'</span></div>'; }).join('');
+    return '<div style="text-align:left;display:inline-block;min-width:140px"><span style="font-size:11px;color:var(--ink2)">🏆 ベスト5</span>'+rows+'</div>';
+  }
   function showWinOverlay(){ const ov=document.getElementById("ov"); if(!ov) return;
     ov.querySelector("h2").textContent="ゲームクリア！"; const kn=ov.querySelector(".kun"); if(kn) kn.style.display="none";   // 結果画面は高さ節約のためグルコース君を隠す
-    const timeLine='<span style="font-size:23px">クリアタイム <b style="color:#EAF6D8">'+fmtTime(elapsed)+'</b></span>'+(winIsBest?' <b style="color:#EAD24E">新記録！</b>':(bestTime!=null?'<br><span style="font-size:12px">ベスト '+fmtTime(bestTime)+'</span>':''));
-    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine+'<br>'+sugarBreakdownHTML();
+    const timeLine='<span style="font-size:23px">クリアタイム <b style="color:#EAF6D8">'+fmtTime(elapsed)+'</b></span>'+(winIsBest?' <b style="color:#EAD24E">新記録！</b>':(winRank?' <b style="color:#EAD24E">'+winRank+'位！</b>':''));
+    const ps=ov.querySelectorAll("p"); if(ps[0]) ps[0].innerHTML=timeLine
+      +'<div style="display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:6px">'+sugarBreakdownHTML()+rankingHTML()+'</div>';
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
     document.getElementById("start").textContent="もう一度"; ov.hidden=false; }
   function denature(){ if(tutMode) tutDenat++;                     // チュートリアル：失活を体験した回数（③のgoal判定）
