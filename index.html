@@ -83,11 +83,11 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v139｜v137ベース】タブ切替方式(v138)をユーザー指示で撤回＝クリア画面は「作った糖」＋「🏆ベスト5」を一緒に表示する形(v137)に戻した。rtabs/rtab CSSとsetTabは削除</span>
+    <span class="hint">【v140｜v139ベース】タイムアタックのストップウォッチを小数第2位まで表示(fmtTimeをtoFixed(2)化・初期値0:00.00)。クリアタイム表示も同時に第2位に</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
-    <div class="tb-time"><b id="timer">0:00.0</b><span id="besttime"></span></div>
+    <div class="tb-time"><b id="timer">0:00.00</b><span id="besttime"></span></div>
     <div class="tb-mute" id="mute">🔊</div>
   </div>
   <div class="meters">
@@ -194,7 +194,7 @@
   try{ const b=localStorage.getItem('kojiShredBest'); if(b){ const bv=parseFloat(b); if(!topTimes.length) topTimes=[bv]; } }catch(e){}  // 旧ベスト値をランキングへ引き継ぎ
   if(topTimes.length) bestTime=topTimes[0];
   (function(){ const d=document.getElementById("dbg"); if(d) d.style.display="none"; })();   // デバッグ表示は隠す（スコアHUDを出すため）
-  function fmtTime(s){ s=Math.max(0,s); const m=Math.floor(s/60), sec=s-m*60; return m+":"+(sec<10?"0":"")+sec.toFixed(1); }
+  function fmtTime(s){ s=Math.max(0,s); const m=Math.floor(s/60), sec=s-m*60; return m+":"+(sec<10?"0":"")+sec.toFixed(2); }
   let firing=false, fireT=0, curN=STARCH_N;
   let shakeX=0,shakeY=0,shakeMag=0, flash=0, bloom=0;
   let starch=[], parts=[], pops=[], rings=[], bonds=[], snaps=[];
