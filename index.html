@@ -65,6 +65,7 @@
   .btnrow .btn{margin-top:0; min-width:150px}   /* 文字数が違ってもボタンの大きさを揃える（もう一度／やめる 等） */
   .btn.ghost{background:transparent; color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset; padding:14px 32px}
   .btn.ghost:active{transform:translateY(2px); box-shadow:0 0 0 2px var(--accent) inset}
+  .overlay .ver{margin-top:16px; font-size:11px; color:var(--ink3); letter-spacing:.06em}   /* タイトル画面の小さなバージョン表記（ゲームの慣例） */
   .coach{position:absolute; left:12px; right:12px; bottom:12px; z-index:7; display:flex; align-items:center; gap:10px;
     background:rgba(20,14,8,.94); border:1px solid var(--accent); border-radius:14px; padding:12px 13px; box-shadow:0 8px 24px rgba(0,0,0,.5)}
   .coach[hidden]{display:none}
@@ -82,9 +83,7 @@
 </style>
 
 <div class="wrap">
-  <header>
-    <span class="hint">【v142｜v141ベース】ボタン幅を揃える＝.btnrow .btnにmin-width:150px、.btn.ghostのpaddingを14px32pxに統一。「もう一度」「やめる」等が文字数に関わらず同サイズに</span>
-  </header>
+  <!-- 開発版数ログ（画面非表示・開発メモ）: 【v143｜v142ベース】開発用バージョン/メモ書きの画面表示を廃止（ヘッダーの.hintをコメント化）＝ユーザーには見えない。代わりにタイトル画面に小さくバージョンのみ表示(.ver)。v142=ボタン幅を揃える(min-width:150px＋ghost padding統一)。v141=クリア/GO画面に「もう一度」「やめる(→タイトル)」。v140=ストップウォッチを小数第2位表示 -->
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
     <div class="tb-time"><b id="timer">0:00.00</b><span id="besttime"></span></div>
@@ -113,6 +112,7 @@
         <b>熱すぎ＝失活</b>／<b>冷やしすぎ＝酸敗</b>に注意。<br>
         <span style="font-size:11.5px; color:var(--ink3)">くわしい遊び方は「あそびかた」で体験！</span></p>
         <div class="btnrow"><button class="btn" id="start">はじめる</button><button class="btn ghost" id="tut">あそびかた</button><button class="btn ghost" id="quit" hidden>やめる</button></div>
+        <div class="ver" id="ver">v143</div>
       </div>
     </div>
     <div class="coach" id="coach" hidden><span id="coachtxt"></span><button class="coachbtn" id="coachnext">次へ</button></div>
@@ -397,6 +397,7 @@
     for(let i=0;i<ps.length;i++) ps[i].style.display="";
     document.getElementById("start").textContent="はじめる";
     document.getElementById("tut").hidden=false; document.getElementById("quit").hidden=true;
+    document.getElementById("ver").style.display="";   // タイトルではバージョン表記を再表示
     ov.hidden=false; }
   document.getElementById("quit").addEventListener("click", showTitle);
   // ---- 操作説明チュートリアル（プレイ画面上でコーチ吹き出し／失活・酸敗しても続行＝安全に練習）----
@@ -593,6 +594,7 @@
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
     document.getElementById("start").textContent="もう一度";
     document.getElementById("tut").hidden=true; document.getElementById("quit").hidden=false;   // 結果画面は「もう一度」「やめる(→タイトル)」
+    document.getElementById("ver").style.display="none";   // バージョン表記はタイトル画面のみ
     ov.hidden=false; }
   function denature(){ if(tutMode) tutDenat++;                     // チュートリアル：失活を体験した回数（③のgoal判定）
     denLock=0.5; temp=DENATURE_KNOCK; heatE=0; charge=0; combo=0; firing=false; pendingSugar=null; pendingCut={};  // ★温度は55℃まで押し戻す（全リセットはしない）＝少し登り直す程度でゲーム続行。硬直中は温度固定
@@ -624,6 +626,7 @@
     for(let i=1;i<ps.length;i++) ps[i].style.display="none";
     document.getElementById("start").textContent="もう一度";
     document.getElementById("tut").hidden=true; document.getElementById("quit").hidden=false;   // 結果画面は「もう一度」「やめる(→タイトル)」
+    document.getElementById("ver").style.display="none";   // バージョン表記はタイトル画面のみ
     ov.hidden=false; }
 
   // ---- 六角形グルコース君 ----
