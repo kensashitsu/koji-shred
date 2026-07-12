@@ -62,8 +62,8 @@
   .btn:active{transform:translateY(3px); box-shadow:0 2px 0 #9c7a1e}
   .overlay .kun{display:block; margin:0 auto 4px; filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
   .btnrow{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
-  .btnrow .btn{margin-top:0}
-  .btn.ghost{background:transparent; color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset; padding:14px 22px}
+  .btnrow .btn{margin-top:0; min-width:150px}   /* 文字数が違ってもボタンの大きさを揃える（もう一度／やめる 等） */
+  .btn.ghost{background:transparent; color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset; padding:14px 32px}
   .btn.ghost:active{transform:translateY(2px); box-shadow:0 0 0 2px var(--accent) inset}
   .coach{position:absolute; left:12px; right:12px; bottom:12px; z-index:7; display:flex; align-items:center; gap:10px;
     background:rgba(20,14,8,.94); border:1px solid var(--accent); border-radius:14px; padding:12px 13px; box-shadow:0 8px 24px rgba(0,0,0,.5)}
@@ -83,7 +83,7 @@
 
 <div class="wrap">
   <header>
-    <span class="hint">【v141｜v140ベース】クリア/GO画面のボタンを「もう一度」＋「やめる」に。やめる=タイトル画面へ復元(TITLE_H2/TITLE_P控え→showTitle)。btnrowにid=quit(初期hidden)追加、結果画面でtut隠しquit表示</span>
+    <span class="hint">【v142｜v141ベース】ボタン幅を揃える＝.btnrow .btnにmin-width:150px、.btn.ghostのpaddingを14px32pxに統一。「もう一度」「やめる」等が文字数に関わらず同サイズに</span>
   </header>
   <div class="topbar">
     <div class="tb-life">酵素 <span class="life" id="life"></span></div>
